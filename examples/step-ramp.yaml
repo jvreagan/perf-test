@@ -1,0 +1,29 @@
+name: "Step Ramp Example"
+description: "VU pool that jumps instantly to target instead of ramping linearly"
+
+load:
+  mode: vu
+  stages:
+    - duration: 10s
+      target: 50
+      ramp: step   # instantly spawn 50 VUs at t=0
+    - duration: 60s
+      target: 50   # hold steady (linear, same target = no change)
+    - duration: 5s
+      target: 0
+      ramp: step   # instantly stop all VUs
+
+http:
+  timeout: 10s
+  follow_redirects: true
+
+endpoints:
+  - name: "Health Check"
+    method: GET
+    url: "http://localhost:8080/health"
+    expect:
+      status: 200
+
+output:
+  format: console
+  interval: 5s

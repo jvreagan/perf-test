@@ -1,0 +1,36 @@
+name: "Max RPS Cap Example"
+description: "VU pool with a global token-bucket rate limiter capping throughput at 200 RPS"
+
+load:
+  mode: vu
+  max_rps: 200    # global cap — no single VU can send more than its share
+  stages:
+    - duration: 30s
+      target: 50   # ramp up to 50 VUs
+    - duration: 60s
+      target: 50   # hold steady
+    - duration: 10s
+      target: 0    # ramp down
+
+http:
+  timeout: 10s
+  follow_redirects: true
+
+endpoints:
+  - name: "API"
+    method: GET
+    url: "http://localhost:8080/api"
+    weight: 3
+    expect:
+      status: 200
+
+  - name: "Health"
+    method: GET
+    url: "http://localhost:8080/health"
+    weight: 1
+    expect:
+      status: 200
+
+output:
+  format: console
+  interval: 5s

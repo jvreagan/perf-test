@@ -1,0 +1,23 @@
+name: "Basic Load Test"
+description: "Simple load test against a single endpoint"
+
+load:
+  ramp_up: 10s
+  steady_state: 30s
+  ramp_down: 10s
+  max_vus: 10
+
+http:
+  timeout: 10s
+  follow_redirects: true
+
+endpoints:
+  - name: "Health Check"
+    method: GET
+    url: "http://localhost:8080/health"
+    expect:
+      status: 200
+
+output:
+  format: console
+  interval: 5s

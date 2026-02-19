@@ -1,0 +1,71 @@
+name: "Advanced API Load Test"
+description: "Multi-endpoint weighted test with data templating"
+
+load:
+  stages:
+    - duration: 30s
+      target: 10
+    - duration: 60s
+      target: 100
+    - duration: 30s
+      target: 0
+
+  max_rps: 500
+  think_time: 50ms
+
+http:
+  timeout: 30s
+  follow_redirects: true
+  insecure_skip_verify: false
+
+variables:
+  base_url: "http://localhost:8080"
+  token: "${API_TOKEN}"
+
+endpoints:
+  - name: "List Users"
+    method: GET
+    url: "${base_url}/users"
+    headers:
+      Authorization: "Bearer ${token}"
+    weight: 3
+    expect:
+      status: 200
+
+  - name: "Get User"
+    method: GET
+    url: "${base_url}/users/${random.int(1,100)}"
+    headers:
+      Authorization: "Bearer ${token}"
+    weight: 4
+    expect:
+      status: 200
+
+  - name: "Create User"
+    method: POST
+    url: "${base_url}/users"
+    headers:
+      Authorization: "Bearer ${token}"
+      Content-Type: "application/json"
+    body: |
+      {
+        "name": "User ${random.string(8)}",
+        "email": "${random.email}",
+        "external_id": "${random.uuid}",
+        "role": "${random.choice(admin,editor,viewer)}"
+      }
+    weight: 1
+    expect:
+      status: 201
+
+  - name: "Health Check"
+    method: GET
+    url: "${base_url}/health"
+    weight: 1
+    expect:
+      status: 200
+
+output:
+  format: console
+  interval: 5s
+  file: results.json
