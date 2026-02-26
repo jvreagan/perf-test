@@ -1,0 +1,261 @@
+{{template "layout" .}}
+
+{{define "title"}}perf-test - Configure Test{{end}}
+
+{{define "content"}}
+<h1>Configure Test</h1>
+
+{{if .FormData.Errors}}
+<div class="errors">
+    <strong>Please fix the following errors:</strong>
+    <ul>
+        {{range .FormData.Errors}}<li>{{.}}</li>{{end}}
+    </ul>
+</div>
+{{end}}
+
+<form method="POST" action="/configure">
+
+{{/* ---- Test Info ---- */}}
+<div class="card">
+    <h2>Test Info</h2>
+    <div class="row">
+        <div>
+            <label for="name">Test Name</label>
+            <input type="text" id="name" name="name" value="{{.FormData.Name}}" placeholder="My API Test">
+        </div>
+        <div>
+            <label for="description">Description</label>
+            <input type="text" id="description" name="description" value="{{.FormData.Description}}" placeholder="Optional description">
+        </div>
+    </div>
+</div>
+
+{{/* ---- Load Configuration ---- */}}
+<div class="card">
+    <h2>Load Configuration</h2>
+    <div class="row">
+        <div>
+            <label for="mode">Load Mode</label>
+            <select id="mode" name="mode">
+                <option value="vu" {{if eq .FormData.Mode "vu"}}selected{{end}}>Virtual Users (VU pool)</option>
+                <option value="arrival_rate" {{if eq .FormData.Mode "arrival_rate"}}selected{{end}}>Arrival Rate (fixed RPS)</option>
+            </select>
+        </div>
+        <div>
+            <label for="load_style">Configuration Style</label>
+            <select id="load_style" name="load_style">
+                <option value="shorthand" {{if eq .FormData.LoadStyle "shorthand"}}selected{{end}}>Simple (ramp up / steady / ramp down)</option>
+                <option value="stages" {{if eq .FormData.LoadStyle "stages"}}selected{{end}}>Advanced (custom stages)</option>
+            </select>
+            <button type="submit" name="action" value="switch_load_style" class="btn btn-sm btn-outline" style="margin-top:0.25rem">Apply Style Change</button>
+        </div>
+    </div>
+
+    {{if eq .FormData.LoadStyle "shorthand"}}
+    <fieldset>
+        <legend>Load Profile (Simple)</legend>
+        <div class="row">
+            <div>
+                <label for="ramp_up">Ramp Up</label>
+                <input type="text" id="ramp_up" name="ramp_up" value="{{.FormData.RampUp}}" placeholder="10s">
+            </div>
+            <div>
+                <label for="steady_state">Steady State</label>
+                <input type="text" id="steady_state" name="steady_state" value="{{.FormData.SteadyState}}" placeholder="60s">
+            </div>
+            <div>
+                <label for="ramp_down">Ramp Down</label>
+                <input type="text" id="ramp_down" name="ramp_down" value="{{.FormData.RampDown}}" placeholder="10s">
+            </div>
+            <div>
+                <label for="max_vus">Max {{if eq .FormData.Mode "arrival_rate"}}RPS{{else}}VUs{{end}}</label>
+                <input type="text" id="max_vus" name="max_vus" value="{{.FormData.MaxVUs}}" placeholder="10">
+            </div>
+        </div>
+    </fieldset>
+    {{else}}
+    <fieldset>
+        <legend>Load Stages</legend>
+        {{range $i, $s := .FormData.Stages}}
+        <div class="row" style="align-items:flex-end; margin-bottom:0.5rem;">
+            <div>
+                {{if eq $i 0}}<label>Duration</label>{{end}}
+                <input type="text" name="stages[{{$i}}].duration" value="{{$s.Duration}}" placeholder="30s">
+            </div>
+            <div>
+                {{if eq $i 0}}<label>Target</label>{{end}}
+                <input type="text" name="stages[{{$i}}].target" value="{{$s.Target}}" placeholder="10">
+            </div>
+            <div>
+                {{if eq $i 0}}<label>Ramp</label>{{end}}
+                <select name="stages[{{$i}}].ramp">
+                    <option value="linear" {{if eq $s.Ramp "linear"}}selected{{else}}{{if eq $s.Ramp ""}}selected{{end}}{{end}}>Linear</option>
+                    <option value="step" {{if eq $s.Ramp "step"}}selected{{end}}>Step</option>
+                </select>
+            </div>
+            <div style="flex:0 0 auto;">
+                {{if eq $i 0}}<label>&nbsp;</label>{{end}}
+                <button type="submit" name="action" value="remove_stage_{{$i}}" class="btn btn-sm btn-danger">Remove</button>
+            </div>
+        </div>
+        {{end}}
+        <button type="submit" name="action" value="add_stage" class="btn btn-sm btn-outline">+ Add Stage</button>
+    </fieldset>
+    {{end}}
+
+    <div class="row">
+        {{if eq .FormData.Mode "vu"}}
+        <div>
+            <label for="think_time">Think Time</label>
+            <input type="text" id="think_time" name="think_time" value="{{.FormData.ThinkTime}}" placeholder="0s (optional)">
+        </div>
+        <div>
+            <label for="max_rps">Max RPS Cap</label>
+            <input type="text" id="max_rps" name="max_rps" value="{{.FormData.MaxRPS}}" placeholder="0 (unlimited)">
+        </div>
+        {{else}}
+        <input type="hidden" name="think_time" value="">
+        <input type="hidden" name="max_rps" value="">
+        {{end}}
+    </div>
+</div>
+
+{{/* ---- HTTP Settings ---- */}}
+<div class="card">
+    <h2>HTTP Settings</h2>
+    <div class="row">
+        <div>
+            <label for="timeout">Request Timeout</label>
+            <input type="text" id="timeout" name="timeout" value="{{.FormData.Timeout}}" placeholder="30s">
+        </div>
+        <div style="padding-top:1.5rem;">
+            <label class="checkbox-label"><input type="checkbox" name="follow_redirects" {{if .FormData.FollowRedirects}}checked{{end}}> Follow Redirects</label>
+            <label class="checkbox-label"><input type="checkbox" name="insecure_skip_verify" {{if .FormData.InsecureSkipVerify}}checked{{end}}> Skip TLS Verification</label>
+        </div>
+    </div>
+</div>
+
+{{/* ---- Variables ---- */}}
+<div class="card">
+    <h2>Variables</h2>
+    <p style="font-size:0.85rem;color:#666;margin-bottom:0.75rem;">Define variables to use in URLs, headers, and bodies as <code>${{"{varname}"}}</code>. Values support env var expansion.</p>
+    {{range $i, $v := .FormData.Variables}}
+    <div class="row" style="align-items:flex-end;margin-bottom:0.5rem;">
+        <div>
+            {{if eq $i 0}}<label>Key</label>{{end}}
+            <input type="text" name="variables[{{$i}}].key" value="{{$v.Key}}" placeholder="base_url">
+        </div>
+        <div>
+            {{if eq $i 0}}<label>Value</label>{{end}}
+            <input type="text" name="variables[{{$i}}].value" value="{{$v.Value}}" placeholder="https://api.example.com">
+        </div>
+        <div style="flex:0 0 auto;">
+            {{if eq $i 0}}<label>&nbsp;</label>{{end}}
+            <button type="submit" name="action" value="remove_variable_{{$i}}" class="btn btn-sm btn-danger">Remove</button>
+        </div>
+    </div>
+    {{end}}
+    <button type="submit" name="action" value="add_variable" class="btn btn-sm btn-outline">+ Add Variable</button>
+</div>
+
+{{/* ---- Endpoints ---- */}}
+<div class="card">
+    <h2>Endpoints</h2>
+    {{range $i, $ep := .FormData.Endpoints}}
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <h3>Endpoint {{add $i 1}}</h3>
+            {{if gt (len $.FormData.Endpoints) 1}}
+            <button type="submit" name="action" value="remove_endpoint_{{$i}}" class="btn btn-sm btn-danger">Remove</button>
+            {{end}}
+        </div>
+        <div class="row">
+            <div>
+                <label>Name</label>
+                <input type="text" name="endpoints[{{$i}}].name" value="{{$ep.Name}}" placeholder="List Users">
+            </div>
+            <div style="flex:0 0 120px;">
+                <label>Method</label>
+                <select name="endpoints[{{$i}}].method">
+                    <option {{if eq $ep.Method "GET"}}selected{{end}}>GET</option>
+                    <option {{if eq $ep.Method "POST"}}selected{{end}}>POST</option>
+                    <option {{if eq $ep.Method "PUT"}}selected{{end}}>PUT</option>
+                    <option {{if eq $ep.Method "DELETE"}}selected{{end}}>DELETE</option>
+                    <option {{if eq $ep.Method "PATCH"}}selected{{end}}>PATCH</option>
+                    <option {{if eq $ep.Method "HEAD"}}selected{{end}}>HEAD</option>
+                </select>
+            </div>
+        </div>
+        <label>URL</label>
+        <input type="text" name="endpoints[{{$i}}].url" value="{{$ep.URL}}" placeholder="https://api.example.com/users">
+        <div class="row">
+            <div style="flex:0 0 100px;">
+                <label>Weight</label>
+                <input type="text" name="endpoints[{{$i}}].weight" value="{{$ep.Weight}}" placeholder="1">
+            </div>
+            <div style="flex:0 0 140px;">
+                <label>Expected Status</label>
+                <input type="text" name="endpoints[{{$i}}].expect_status" value="{{$ep.ExpectStatus}}" placeholder="200">
+            </div>
+            <div></div>
+        </div>
+        <label>Request Body (optional)</label>
+        <textarea name="endpoints[{{$i}}].body" placeholder='{"name":"${random.string(8)}"}'>{{$ep.Body}}</textarea>
+
+        <fieldset style="margin-top:0.5rem;">
+            <legend>Headers</legend>
+            {{range $j, $h := $ep.Headers}}
+            <div class="row" style="align-items:flex-end;margin-bottom:0.5rem;">
+                <div>
+                    {{if eq $j 0}}<label>Key</label>{{end}}
+                    <input type="text" name="endpoints[{{$i}}].headers[{{$j}}].key" value="{{$h.Key}}" placeholder="Content-Type">
+                </div>
+                <div>
+                    {{if eq $j 0}}<label>Value</label>{{end}}
+                    <input type="text" name="endpoints[{{$i}}].headers[{{$j}}].value" value="{{$h.Value}}" placeholder="application/json">
+                </div>
+                <div style="flex:0 0 auto;">
+                    {{if eq $j 0}}<label>&nbsp;</label>{{end}}
+                    <button type="submit" name="action" value="remove_header_{{$i}}_{{$j}}" class="btn btn-sm btn-danger">Remove</button>
+                </div>
+            </div>
+            {{end}}
+            <button type="submit" name="action" value="add_header_{{$i}}" class="btn btn-sm btn-outline">+ Add Header</button>
+        </fieldset>
+    </div>
+    {{end}}
+    <button type="submit" name="action" value="add_endpoint" class="btn btn-sm btn-outline">+ Add Endpoint</button>
+</div>
+
+{{/* ---- Output Settings ---- */}}
+<div class="card">
+    <h2>Output Settings</h2>
+    <div class="row">
+        <div>
+            <label for="output_format">Format</label>
+            <select id="output_format" name="output_format">
+                <option value="console" {{if eq .FormData.OutputFormat "console"}}selected{{end}}>Console</option>
+                <option value="json" {{if eq .FormData.OutputFormat "json"}}selected{{end}}>JSON</option>
+                <option value="csv" {{if eq .FormData.OutputFormat "csv"}}selected{{end}}>CSV</option>
+            </select>
+        </div>
+        <div>
+            <label for="output_interval">Report Interval</label>
+            <input type="text" id="output_interval" name="output_interval" value="{{.FormData.OutputInterval}}" placeholder="5s">
+        </div>
+        <div>
+            <label for="output_file">Results File (optional)</label>
+            <input type="text" id="output_file" name="output_file" value="{{.FormData.OutputFile}}" placeholder="results.json">
+        </div>
+    </div>
+</div>
+
+{{/* ---- Submit ---- */}}
+<div class="actions">
+    <button type="submit" name="action" value="run" class="btn btn-success">Run Test</button>
+    <a href="/" class="btn btn-outline">Cancel</a>
+</div>
+
+</form>
+{{end}}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sync"
@@ -20,7 +21,8 @@ import (
 
 // Engine orchestrates the entire load test run.
 type Engine struct {
-	cfg *config.Config
+	cfg       *config.Config
+	collector *metrics.Collector
 }
 
 // New creates an Engine from the given config.
@@ -33,11 +35,18 @@ type workerEntry struct {
 	done   chan struct{}
 }
 
-// Run executes the load test and returns a non-nil error if the test had any failures.
-func (e *Engine) Run(ctx context.Context) error {
+// Collector returns the metrics collector, available after Run has started.
+func (e *Engine) Collector() *metrics.Collector {
+	return e.collector
+}
+
+// Run executes the load test. It writes periodic and summary output to w and
+// returns the final stats snapshot. A non-nil error indicates test failures.
+func (e *Engine) Run(ctx context.Context, w io.Writer) (*metrics.Stats, error) {
 	client := e.buildClient()
 	startTime := time.Now()
 	collector := metrics.NewCollector(startTime)
+	e.collector = collector
 	gen := data.NewGenerator(e.cfg.Variables)
 
 	resultCh := make(chan metrics.Result, 1000)
@@ -73,7 +82,7 @@ func (e *Engine) Run(ctx context.Context) error {
 			select {
 			case <-ticker.C:
 				snap := collector.Snapshot()
-				reporter.Print(os.Stdout, snap)
+				reporter.Print(w, snap)
 			case <-ctx.Done():
 				return
 			case <-schedDone:
@@ -99,21 +108,21 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	// Final report
 	finalStats := collector.Snapshot()
-	reporter.Summary(os.Stdout, finalStats)
+	reporter.Summary(w, finalStats)
 
 	// Write JSON if configured
 	if e.cfg.Output.File != "" {
 		if err := reporter.WriteJSON(e.cfg.Output.File, finalStats); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to write results file: %v\n", err)
 		} else {
-			fmt.Fprintf(os.Stdout, "Results written to: %s\n", e.cfg.Output.File)
+			fmt.Fprintf(w, "Results written to: %s\n", e.cfg.Output.File)
 		}
 	}
 
 	if finalStats.ErrorCount > 0 {
-		return fmt.Errorf("test completed with %d errors out of %d requests", finalStats.ErrorCount, finalStats.TotalRequests)
+		return finalStats, fmt.Errorf("test completed with %d errors out of %d requests", finalStats.ErrorCount, finalStats.TotalRequests)
 	}
-	return nil
+	return finalStats, nil
 }
 
 // runVU runs the existing VU pool mode, optionally with a global max_rps limiter.

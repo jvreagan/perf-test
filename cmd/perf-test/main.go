@@ -66,7 +66,7 @@ func runCmd() *cobra.Command {
 			}()
 
 			eng := engine.New(cfg)
-			if err := eng.Run(ctx); err != nil {
+			if _, err := eng.Run(ctx, os.Stdout); err != nil {
 				fmt.Fprintf(os.Stderr, "Test completed with failures: %v\n", err)
 				os.Exit(1)
 			}

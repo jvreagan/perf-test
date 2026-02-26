@@ -1,0 +1,83 @@
+{{template "layout" .}}
+
+{{define "title"}}perf-test - Test Running{{end}}
+
+{{define "head"}}<meta http-equiv="refresh" content="2">{{end}}
+
+{{define "content"}}
+<h1>{{.TestRun.Config.Name}} <span class="badge badge-running">running</span></h1>
+
+{{if .Stats}}
+{{if .TotalDuration}}
+<div class="progress-bar">
+    <div class="fill" style="width:{{.ProgressPct}}%"></div>
+</div>
+{{end}}
+
+<div class="stats-grid">
+    <div class="stat-box">
+        <div class="value">{{fmtElapsed .Stats.Elapsed}}</div>
+        <div class="label">Elapsed</div>
+    </div>
+    <div class="stat-box">
+        <div class="value">{{.Stats.ActiveVUs}}</div>
+        <div class="label">Active VUs</div>
+    </div>
+    <div class="stat-box">
+        <div class="value">{{fmtFloat .Stats.RPS}}</div>
+        <div class="label">RPS</div>
+    </div>
+    <div class="stat-box">
+        <div class="value">{{.Stats.TotalRequests}}</div>
+        <div class="label">Requests</div>
+    </div>
+    <div class="stat-box">
+        <div class="value">{{.Stats.ErrorCount}}</div>
+        <div class="label">Errors ({{fmtPct .Stats.ErrorCount .Stats.TotalRequests}}%)</div>
+    </div>
+    <div class="stat-box">
+        <div class="value">{{fmtDuration .Stats.P50}}</div>
+        <div class="label">p50 Latency</div>
+    </div>
+</div>
+
+{{if .Stats.PerEndpoint}}
+<div class="card">
+    <h2>Per-Endpoint</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Endpoint</th>
+                <th class="num">Reqs</th>
+                <th class="num">Errors</th>
+                <th class="num">p50</th>
+                <th class="num">p90</th>
+                <th class="num">p99</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range $name, $ep := .Stats.PerEndpoint}}
+            <tr>
+                <td>{{$name}}</td>
+                <td class="num">{{$ep.TotalRequests}}</td>
+                <td class="num">{{$ep.ErrorCount}}</td>
+                <td class="num">{{fmtDuration $ep.P50}}</td>
+                <td class="num">{{fmtDuration $ep.P90}}</td>
+                <td class="num">{{fmtDuration $ep.P99}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
+{{else}}
+<div class="card">
+    <p>Waiting for first results...</p>
+</div>
+{{end}}
+
+<div class="actions">
+    <a href="/test/{{.TestRun.ID}}/stop" class="btn btn-danger">Stop Test</a>
+    <a href="/" class="btn btn-outline">Dashboard</a>
+</div>
+{{end}}

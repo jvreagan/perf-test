@@ -107,8 +107,8 @@ func Load(path string) (*Config, error) {
 		cfg.Variables[k] = os.ExpandEnv(v)
 	}
 
-	cfg.applyDefaults()
-	cfg.normalizeStages()
+	cfg.ApplyDefaults()
+	cfg.NormalizeStages()
 
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("validating config: %w", err)
@@ -117,8 +117,8 @@ func Load(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-// applyDefaults sets sensible defaults for unspecified fields.
-func (c *Config) applyDefaults() {
+// ApplyDefaults sets sensible defaults for unspecified fields.
+func (c *Config) ApplyDefaults() {
 	if c.Load.Mode == "" {
 		c.Load.Mode = "vu"
 	}
@@ -144,8 +144,8 @@ func (c *Config) applyDefaults() {
 	}
 }
 
-// normalizeStages converts simple shorthand (ramp_up/steady_state/ramp_down) into stages.
-func (c *Config) normalizeStages() {
+// NormalizeStages converts simple shorthand (ramp_up/steady_state/ramp_down) into stages.
+func (c *Config) NormalizeStages() {
 	if len(c.Load.Stages) > 0 {
 		return
 	}

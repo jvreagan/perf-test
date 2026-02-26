@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -53,7 +54,7 @@ func TestEngine_Run_BasicSuccess(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := e.Run(ctx)
+	_, err := e.Run(ctx, io.Discard)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -71,7 +72,7 @@ func TestEngine_Run_WithErrors(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := e.Run(ctx)
+	_, err := e.Run(ctx, io.Discard)
 	if err == nil {
 		t.Error("expected error when server returns 500 but endpoint expects 200")
 	}
@@ -95,7 +96,8 @@ func TestEngine_Run_GracefulShutdown(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- e.Run(ctx)
+		_, err := e.Run(ctx, io.Discard)
+		done <- err
 	}()
 
 	select {
@@ -122,7 +124,7 @@ func TestEngine_Run_ArrivalRate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := e.Run(ctx); err != nil {
+	if _, err := e.Run(ctx, io.Discard); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -142,7 +144,7 @@ func TestEngine_Run_MaxRPSCap(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := e.Run(ctx); err != nil {
+	if _, err := e.Run(ctx, io.Discard); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -163,7 +165,7 @@ func TestEngine_Run_StepRampVUMode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := e.Run(ctx); err != nil {
+	if _, err := e.Run(ctx, io.Discard); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -184,7 +186,7 @@ func TestEngine_Run_MultipleEndpoints(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := e.Run(ctx); err != nil {
+	if _, err := e.Run(ctx, io.Discard); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

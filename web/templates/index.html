@@ -1,0 +1,46 @@
+{{template "layout" .}}
+
+{{define "title"}}perf-test - Dashboard{{end}}
+
+{{define "content"}}
+<h1>Dashboard</h1>
+
+{{if .Active}}
+<div class="card">
+    <h2>Running Test <span class="badge badge-running">running</span></h2>
+    <p><strong>{{.Active.Config.Name}}</strong></p>
+    <div class="actions">
+        <a href="/test/{{.Active.ID}}" class="btn btn-primary">View Progress</a>
+        <a href="/test/{{.Active.ID}}/stop" class="btn btn-danger">Stop</a>
+    </div>
+</div>
+{{end}}
+
+<div class="card">
+    <h2>Recent Tests</h2>
+    {{if .Recent}}
+    <ul class="test-list">
+        {{range .Recent}}
+        <li>
+            <div>
+                <span class="test-name">{{.Config.Name}}</span>
+                {{if eq .Status "completed"}}<span class="badge badge-completed">completed</span>
+                {{else if eq .Status "failed"}}<span class="badge badge-failed">failed</span>
+                {{else if eq .Status "stopped"}}<span class="badge badge-stopped">stopped</span>{{end}}
+                <div class="test-meta">
+                    {{if .FinalStats}}{{.FinalStats.TotalRequests}} requests | {{fmtElapsed .FinalStats.Elapsed}}{{end}}
+                </div>
+            </div>
+            <a href="/test/{{.ID}}" class="btn btn-sm btn-outline">View</a>
+        </li>
+        {{end}}
+    </ul>
+    {{else}}
+    <p>No tests have been run yet.</p>
+    {{end}}
+</div>
+
+<div class="actions">
+    <a href="/configure" class="btn btn-success">New Test</a>
+</div>
+{{end}}
