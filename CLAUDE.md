@@ -23,13 +23,54 @@ output, and JSON results export.
 
 ---
 
+## Web UI
+
+```bash
+go run ./web/cmd                    # Start web UI on localhost:8080
+go run ./web/cmd --addr :9090       # Custom address
+```
+
+### Routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/` | Dashboard: running test + recent completed tests |
+| GET | `/configure` | Configuration form for new test |
+| POST | `/configure` | Form post-back (add/remove items) or run test |
+| GET | `/test/{id}` | Live progress (auto-refresh) or final results |
+| GET | `/test/{id}/stop` | Cancel running test |
+
+### Web Architecture
+
+- **Zero JavaScript** — all interactions use HTML form post-back pattern
+- **Server-rendered** via Go `html/template` with per-page layout inheritance
+- **Live progress** via `<meta http-equiv="refresh" content="2">` (pure HTML)
+- **Direct engine import** — web layer calls `engine.Run()` and `engine.Collector().Snapshot()` for live metrics
+- **In-memory state** — test runs stored in a mutex-protected map; lost on restart
+- **One test at a time** — `State.activeID` enforces single concurrent test
+
+### Form Post-Back Pattern
+
+Dynamic form elements (endpoints, stages, headers, variables) use submit buttons with `name="action"` values like `add_endpoint`, `remove_endpoint_0`, `add_header_1`, `switch_load_style`. The handler checks the action, modifies the `FormData` struct, and re-renders. The main submit uses `action=run`.
+
+### Key Types
+
+- `FormData` — all form fields as strings, with `ParseFormData(r)` and `ToConfig()` methods
+- `State` — in-memory map of `TestRun` structs, tracks `activeID`
+- `TestRun` — holds engine, cancel func, config, status, and final stats
+- `Handlers` — HTTP handlers with `State` and `Templates` dependencies
+- `Templates` — per-page template sets, each paired with layout.html
+
+---
+
 ## Building
 
 ```bash
 cd /Users/jamesreagan/code/perf-test
 go build ./...                        # Build all packages
-go build -o perf-test ./cmd/perf-test # Build binary
+go build -o perf-test ./cmd/perf-test # Build CLI binary
 go test ./...                         # Run all tests
+go run ./web/cmd                      # Start web UI on localhost:8080
 ```
 
 ---
@@ -48,6 +89,14 @@ internal/
   metrics/collector.go          Thread-safe result aggregation + percentiles
   reporter/reporter.go          Console table + JSON file output
   data/generator.go             ${token} template engine
+web/
+  cmd/main.go                   Web UI entry point (go run ./web/cmd)
+  server.go                     HTTP server + route registration (Go 1.22 ServeMux)
+  handlers.go                   All HTTP handlers (index, configure, test status, stop)
+  formdata.go                   Form data parsing + conversion to config.Config
+  state.go                      In-memory test run state (TestRun, State)
+  templates.go                  Template loading with per-page layout inheritance
+  templates/                    Server-rendered HTML templates (no JavaScript)
 examples/                       Example YAML configs
 ```
 
@@ -230,6 +279,17 @@ Full initial implementation including:
 - Graceful shutdown on SIGINT/SIGTERM
 - Example configs for all three new features
 
+### v0.2.0 — Web UI (2026-02-26)
+Server-rendered web UI with zero JavaScript:
+- Full config form: test info, load mode/stages/shorthand, HTTP settings, variables, endpoints with headers, output settings
+- Dynamic form elements via HTML post-back pattern (add/remove endpoints, stages, headers, variables)
+- Live test progress with `<meta http-equiv="refresh">` auto-refresh showing VUs, RPS, latency, per-endpoint breakdown
+- Final results page with full latency summary and per-endpoint stats
+- Dashboard with active test and recent test history
+- Engine modified: `Run()` accepts `io.Writer`, returns `(*metrics.Stats, error)`, exposes `Collector()` for live snapshots
+- Config methods `ApplyDefaults()` and `NormalizeStages()` exported for web layer reuse
+- 30 tests (unit + integration) using `net/http/httptest`
+
 ### Live Test Run (2026-02-21)
 Ran a 2-minute ramp from 0.1 RPS → 1 RPS against httpbin.org/get:
 - Config: VU mode, `think_time: 9s`, 1→10 VUs over 2 minutes
@@ -245,5 +305,5 @@ Ran a 2-minute ramp from 0.1 RPS → 1 RPS against httpbin.org/get:
 
 ---
 
-**Last Updated**: 2026-02-21
-**Status**: v0.1.0 ✅
+**Last Updated**: 2026-02-26
+**Status**: v0.2.0 ✅

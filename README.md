@@ -1,9 +1,10 @@
 # perf-test
 
-A production-quality open-source CLI performance testing tool for HTTP APIs.
+A production-quality open-source performance testing tool for HTTP APIs. Use the CLI with YAML configs or the built-in web UI — no JavaScript required.
 
 ## Features
 
+- **CLI + Web UI** — Run tests from the command line or configure them in a browser
 - **Config-file driven** — YAML-based test configuration
 - **Two load modes** — VU pool or constant arrival rate
 - **Stage-based load profiles** — Linear or instant-step ramp with arbitrary stages
@@ -40,6 +41,60 @@ perf-test validate examples/advanced.yaml
 # Show version
 perf-test version
 ```
+
+## Web UI
+
+perf-test includes a browser-based interface for configuring and running tests. It uses server-rendered HTML with no JavaScript — all interactions work through standard HTML forms.
+
+### Starting the Web UI
+
+```bash
+# From the project root
+go run ./web/cmd
+
+# Custom address
+go run ./web/cmd --addr localhost:9090
+```
+
+Open http://localhost:8080 in your browser.
+
+### Using the Web UI
+
+**Dashboard** (`/`) — Shows any running test and a list of recent completed tests. Click "New Test" to configure a test, or click any completed test to review its results.
+
+**Configure a test** (`/configure`) — A form-based editor for all perf-test settings:
+
+1. **Test Info** — Name and description for your test.
+2. **Load Configuration** — Choose the load mode and how to define the load profile:
+   - **Load Mode**: "Virtual Users (VU pool)" maintains N concurrent users; "Arrival Rate (fixed RPS)" dispatches requests at a target rate.
+   - **Configuration Style**: "Simple" uses ramp up / steady state / ramp down with a single target. "Advanced" lets you define arbitrary stages, each with its own duration, target, and ramp type (linear or step).
+   - To switch between Simple and Advanced, select the style and click "Apply Style Change".
+   - In VU mode, you can also set **Think Time** (pause between requests per VU) and **Max RPS Cap** (global rate limit).
+3. **HTTP Settings** — Request timeout, follow redirects, and TLS verification skip.
+4. **Variables** — Key-value pairs you can reference in URLs, headers, and bodies as `${varname}`. Values support environment variable expansion. Click "+ Add Variable" to add more.
+5. **Endpoints** — One or more HTTP endpoints to test. Each endpoint has:
+   - Name, HTTP method, URL
+   - Weight (for distributing traffic — higher weight = more traffic)
+   - Expected status code
+   - Request body (supports data templating tokens like `${random.uuid}`)
+   - Headers (click "+ Add Header" within each endpoint)
+   - Click "+ Add Endpoint" to add more endpoints, or "Remove" to delete one.
+6. **Output Settings** — Report format, interval, and optional results file path.
+
+Click **"Run Test"** to validate and start the test.
+
+**Live progress** (`/test/{id}`) — While a test is running, this page auto-refreshes every 2 seconds showing:
+- Progress bar (based on total stage duration)
+- Active VUs, current RPS, total requests, error count
+- Per-endpoint table with request counts and p50/p90/p99 latency
+- A "Stop Test" button to cancel early
+
+**Results** (`/test/{id}`) — After a test completes (or is stopped), shows the final report:
+- Total requests, success/error counts, average RPS
+- Latency summary: p50, p90, p95, p99, min, max, avg
+- Per-endpoint breakdown with all the same metrics
+
+Only one test can run at a time. If you try to start a second test while one is running, the form will show an error and link you to the running test.
 
 ## Load Modes
 
@@ -223,8 +278,9 @@ POST /users                     1066    82.0ms   180.0ms   490.0ms
 
 ```bash
 go test ./...                          # run all tests
-go build -o perf-test ./cmd/perf-test  # build binary
+go build -o perf-test ./cmd/perf-test  # build CLI binary
 ./perf-test validate examples/basic.yaml
+go run ./web/cmd                       # start web UI on localhost:8080
 ```
 
 ## License
