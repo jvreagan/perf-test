@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -132,5 +133,57 @@ func TestSetActiveVUs(t *testing.T) {
 	snap := c.Snapshot()
 	if snap.ActiveVUs != 42 {
 		t.Errorf("expected 42 active VUs, got %d", snap.ActiveVUs)
+	}
+}
+
+func TestStatusCodeTracking(t *testing.T) {
+	c := NewCollector(time.Now())
+	c.Record(Result{EndpointName: "ep", StatusCode: 200, Duration: 10 * time.Millisecond, Success: true})
+	c.Record(Result{EndpointName: "ep", StatusCode: 200, Duration: 10 * time.Millisecond, Success: true})
+	c.Record(Result{EndpointName: "ep", StatusCode: 404, Duration: 10 * time.Millisecond, Success: false, Error: fmt.Errorf("expected status 200, got 404")})
+	c.Record(Result{EndpointName: "ep", StatusCode: 500, Duration: 10 * time.Millisecond, Success: false, Error: fmt.Errorf("expected status 200, got 500")})
+
+	snap := c.Snapshot()
+
+	// Global status codes
+	if snap.StatusCodes[200] != 2 {
+		t.Errorf("expected 2x 200, got %d", snap.StatusCodes[200])
+	}
+	if snap.StatusCodes[404] != 1 {
+		t.Errorf("expected 1x 404, got %d", snap.StatusCodes[404])
+	}
+	if snap.StatusCodes[500] != 1 {
+		t.Errorf("expected 1x 500, got %d", snap.StatusCodes[500])
+	}
+
+	// Per-endpoint status codes
+	epStats := snap.PerEndpoint["ep"]
+	if epStats.StatusCodes[200] != 2 {
+		t.Errorf("ep: expected 2x 200, got %d", epStats.StatusCodes[200])
+	}
+}
+
+func TestErrorTypeClassification(t *testing.T) {
+	c := NewCollector(time.Now())
+	c.Record(Result{EndpointName: "ep", Duration: 10 * time.Millisecond, Success: false, Error: fmt.Errorf("context deadline exceeded (timeout)")})
+	c.Record(Result{EndpointName: "ep", Duration: 10 * time.Millisecond, Success: false, Error: fmt.Errorf("dial tcp: connection refused")})
+	c.Record(Result{EndpointName: "ep", StatusCode: 500, Duration: 10 * time.Millisecond, Success: false, Error: fmt.Errorf("expected status 200, got 500: status mismatch")})
+
+	snap := c.Snapshot()
+
+	if snap.ErrorTypes["timeout"] != 1 {
+		t.Errorf("expected 1 timeout, got %d", snap.ErrorTypes["timeout"])
+	}
+	if snap.ErrorTypes["connection_refused"] != 1 {
+		t.Errorf("expected 1 connection_refused, got %d", snap.ErrorTypes["connection_refused"])
+	}
+	if snap.ErrorTypes["status_mismatch"] != 1 {
+		t.Errorf("expected 1 status_mismatch, got %d", snap.ErrorTypes["status_mismatch"])
+	}
+
+	// Per-endpoint
+	epStats := snap.PerEndpoint["ep"]
+	if epStats.ErrorTypes["timeout"] != 1 {
+		t.Errorf("ep: expected 1 timeout, got %d", epStats.ErrorTypes["timeout"])
 	}
 }

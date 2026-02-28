@@ -76,6 +76,15 @@ type OutputConfig struct {
 	File     string   `yaml:"file"`
 }
 
+// ThresholdConfig holds pass/fail criteria for the test.
+type ThresholdConfig struct {
+	P95        Duration `yaml:"p95"`
+	P99        Duration `yaml:"p99"`
+	MaxLatency Duration `yaml:"max_latency"`
+	ErrorRate  float64  `yaml:"error_rate"`  // percentage 0-100
+	MinRPS     float64  `yaml:"min_rps"`
+}
+
 // Config is the top-level configuration structure.
 type Config struct {
 	Name        string            `yaml:"name"`
@@ -85,6 +94,7 @@ type Config struct {
 	Variables   map[string]string `yaml:"variables"`
 	Endpoints   []Endpoint        `yaml:"endpoints"`
 	Output      OutputConfig      `yaml:"output"`
+	Thresholds  ThresholdConfig   `yaml:"thresholds"`
 }
 
 // Load reads a config file, parses YAML, expands environment variables only
@@ -217,7 +227,19 @@ func (c *Config) Validate() error {
 	if !validFormats[c.Output.Format] {
 		return fmt.Errorf("output.format must be one of: console, json, csv (got %q)", c.Output.Format)
 	}
+	if c.Thresholds.ErrorRate < 0 || c.Thresholds.ErrorRate > 100 {
+		return fmt.Errorf("thresholds.error_rate must be between 0 and 100 (got %.1f)", c.Thresholds.ErrorRate)
+	}
+	if c.Thresholds.MinRPS < 0 {
+		return fmt.Errorf("thresholds.min_rps must be >= 0 (got %.1f)", c.Thresholds.MinRPS)
+	}
 	return nil
+}
+
+// HasThresholds returns true if any threshold is configured.
+func (tc ThresholdConfig) HasThresholds() bool {
+	return tc.P95.Duration > 0 || tc.P99.Duration > 0 || tc.MaxLatency.Duration > 0 ||
+		tc.ErrorRate > 0 || tc.MinRPS > 0
 }
 
 // TotalDuration returns the sum of all stage durations.

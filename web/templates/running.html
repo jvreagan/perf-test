@@ -70,6 +70,34 @@
     </table>
 </div>
 {{end}}
+
+{{if .Stats.StatusCodes}}
+<div class="card">
+    <h2>Status Codes</h2>
+    <div class="stats-grid">
+        {{range $code, $count := .Stats.StatusCodes}}
+        <div class="stat-box">
+            <div class="value">{{$count}}</div>
+            <div class="label">{{$code}}</div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{if .Stats.ErrorTypes}}
+<div class="card">
+    <h2>Error Types</h2>
+    <div class="stats-grid">
+        {{range $errType, $count := .Stats.ErrorTypes}}
+        <div class="stat-box">
+            <div class="value">{{$count}}</div>
+            <div class="label">{{$errType}}</div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}
 {{else}}
 <div class="card">
     <p>Waiting for first results...</p>

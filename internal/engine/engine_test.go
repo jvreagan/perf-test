@@ -170,6 +170,52 @@ func TestEngine_Run_StepRampVUMode(t *testing.T) {
 	}
 }
 
+func TestEngine_Run_ThresholdPass(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	cfg := makeConfig(srv.URL)
+	cfg.Thresholds.P95 = config.Duration{Duration: 5 * time.Second}
+	cfg.Thresholds.ErrorRate = 10.0
+	e := New(cfg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stats, err := e.Run(ctx, io.Discard)
+	if err != nil {
+		t.Errorf("expected no error when thresholds pass, got: %v", err)
+	}
+	if len(stats.ThresholdResults) == 0 {
+		t.Error("expected threshold results to be populated")
+	}
+}
+
+func TestEngine_Run_ThresholdFail(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer srv.Close()
+
+	cfg := makeConfig(srv.URL)
+	// Set a very tight error rate threshold that will be breached
+	cfg.Thresholds.ErrorRate = 0.1
+	e := New(cfg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := e.Run(ctx, io.Discard)
+	if err == nil {
+		t.Error("expected error when thresholds fail")
+	}
+	if err != nil && !strings.Contains(err.Error(), "threshold(s) breached") {
+		t.Errorf("expected threshold breach error, got: %v", err)
+	}
+}
+
 func TestEngine_Run_MultipleEndpoints(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)

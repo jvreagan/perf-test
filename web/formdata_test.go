@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDefaultFormData(t *testing.T) {
@@ -344,6 +345,94 @@ func TestToConfig_InvalidStageTarget(t *testing.T) {
 	_, err := fd.ToConfig()
 	if err == nil {
 		t.Fatal("expected error for invalid stage target")
+	}
+}
+
+func TestToConfig_WithThresholds(t *testing.T) {
+	fd := &FormData{
+		Mode:        "vu",
+		LoadStyle:   "shorthand",
+		RampUp:      "10s",
+		SteadyState: "30s",
+		RampDown:    "10s",
+		MaxVUs:      "10",
+		Timeout:     "30s",
+		OutputFormat:   "console",
+		OutputInterval: "5s",
+		ThresholdP95:        "500ms",
+		ThresholdP99:        "2s",
+		ThresholdErrorRate:  "5",
+		ThresholdMinRPS:     "100",
+		Endpoints: []EndpointData{
+			{Method: "GET", URL: "http://localhost/health", Weight: "1", ExpectStatus: "200"},
+		},
+	}
+	cfg, err := fd.ToConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Thresholds.P95.Duration != 500*time.Millisecond {
+		t.Errorf("threshold p95: expected 500ms, got %v", cfg.Thresholds.P95.Duration)
+	}
+	if cfg.Thresholds.P99.Duration != 2*time.Second {
+		t.Errorf("threshold p99: expected 2s, got %v", cfg.Thresholds.P99.Duration)
+	}
+	if cfg.Thresholds.ErrorRate != 5.0 {
+		t.Errorf("threshold error_rate: expected 5.0, got %f", cfg.Thresholds.ErrorRate)
+	}
+	if cfg.Thresholds.MinRPS != 100.0 {
+		t.Errorf("threshold min_rps: expected 100.0, got %f", cfg.Thresholds.MinRPS)
+	}
+}
+
+func TestToConfig_WithoutThresholds(t *testing.T) {
+	fd := &FormData{
+		Mode:        "vu",
+		LoadStyle:   "shorthand",
+		RampUp:      "10s",
+		SteadyState: "30s",
+		RampDown:    "10s",
+		MaxVUs:      "10",
+		Timeout:     "30s",
+		OutputFormat:   "console",
+		OutputInterval: "5s",
+		Endpoints: []EndpointData{
+			{Method: "GET", URL: "http://localhost/health", Weight: "1", ExpectStatus: "200"},
+		},
+	}
+	cfg, err := fd.ToConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Thresholds.HasThresholds() {
+		t.Error("expected no thresholds configured")
+	}
+}
+
+func TestParseFormData_Thresholds(t *testing.T) {
+	vals := url.Values{
+		"threshold_p95":         {"500ms"},
+		"threshold_p99":         {"2s"},
+		"threshold_max_latency": {"5s"},
+		"threshold_error_rate":  {"5"},
+		"threshold_min_rps":     {"100"},
+	}
+	fd := ParseFormData(makeFormRequest(vals))
+
+	if fd.ThresholdP95 != "500ms" {
+		t.Errorf("threshold_p95: got %q", fd.ThresholdP95)
+	}
+	if fd.ThresholdP99 != "2s" {
+		t.Errorf("threshold_p99: got %q", fd.ThresholdP99)
+	}
+	if fd.ThresholdMaxLatency != "5s" {
+		t.Errorf("threshold_max_latency: got %q", fd.ThresholdMaxLatency)
+	}
+	if fd.ThresholdErrorRate != "5" {
+		t.Errorf("threshold_error_rate: got %q", fd.ThresholdErrorRate)
+	}
+	if fd.ThresholdMinRPS != "100" {
+		t.Errorf("threshold_min_rps: got %q", fd.ThresholdMinRPS)
 	}
 }
 

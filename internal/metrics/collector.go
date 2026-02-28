@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,6 +31,8 @@ type EndpointStats struct {
 	Min           time.Duration
 	Max           time.Duration
 	Avg           time.Duration
+	StatusCodes   map[int]int64
+	ErrorTypes    map[string]int64
 }
 
 // Stats is a point-in-time snapshot of all collected metrics.
@@ -49,13 +51,18 @@ type Stats struct {
 	PerEndpoint   map[string]*EndpointStats
 	ActiveVUs     int
 	Elapsed       time.Duration
+	StatusCodes      map[int]int64
+	ErrorTypes       map[string]int64
+	ThresholdResults []ThresholdResult `json:",omitempty"`
 }
 
 type endpointData struct {
-	durations []time.Duration
-	successes int64
-	errors    int64
-	bytes     int64
+	reservoir  *Reservoir
+	successes  int64
+	errors     int64
+	bytes      int64
+	statusCodes map[int]int64
+	errorTypes  map[string]int64
 }
 
 // Collector gathers Results from concurrent workers thread-safely.
@@ -88,15 +95,47 @@ func (c *Collector) Record(r Result) {
 
 	ep, ok := c.endpoints[r.EndpointName]
 	if !ok {
-		ep = &endpointData{}
+		ep = &endpointData{
+			reservoir:   NewReservoir(DefaultReservoirSize),
+			statusCodes: make(map[int]int64),
+			errorTypes:  make(map[string]int64),
+		}
 		c.endpoints[r.EndpointName] = ep
 	}
-	ep.durations = append(ep.durations, r.Duration)
+	ep.reservoir.Add(r.Duration)
 	ep.bytes += r.BytesReceived
+
+	if r.StatusCode > 0 {
+		ep.statusCodes[r.StatusCode]++
+	}
+
 	if r.Success {
 		ep.successes++
 	} else {
 		ep.errors++
+		if r.Error != nil {
+			ep.errorTypes[classifyError(r.Error)]++
+		}
+	}
+}
+
+// classifyError categorizes an error by inspecting its message.
+func classifyError(err error) string {
+	msg := strings.ToLower(err.Error())
+
+	switch {
+	case strings.Contains(msg, "status mismatch") || strings.Contains(msg, "expected status"):
+		return "status_mismatch"
+	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline exceeded"):
+		return "timeout"
+	case strings.Contains(msg, "connection refused"):
+		return "connection_refused"
+	case strings.Contains(msg, "no such host") || strings.Contains(msg, "dns"):
+		return "dns_error"
+	case strings.Contains(msg, "tls") || strings.Contains(msg, "certificate"):
+		return "tls_error"
+	default:
+		return "other"
 	}
 }
 
@@ -110,9 +149,15 @@ func (c *Collector) Snapshot() *Stats {
 		Elapsed:     elapsed,
 		ActiveVUs:   c.activeVUs,
 		PerEndpoint: make(map[string]*EndpointStats),
+		StatusCodes: make(map[int]int64),
+		ErrorTypes:  make(map[string]int64),
 	}
 
-	var allDurations []time.Duration
+	// For global stats, merge all reservoir buffers into a temporary reservoir.
+	globalRes := NewReservoir(DefaultReservoirSize)
+	var globalMin, globalMax, globalSum time.Duration
+	var globalCount int64
+	firstGlobal := true
 
 	for name, ep := range c.endpoints {
 		total := ep.successes + ep.errors
@@ -122,37 +167,69 @@ func (c *Collector) Snapshot() *Stats {
 			SuccessCount:  ep.successes,
 			ErrorCount:    ep.errors,
 			TotalBytes:    ep.bytes,
+			StatusCodes:   make(map[int]int64),
+			ErrorTypes:    make(map[string]int64),
 		}
-		if len(ep.durations) > 0 {
-			sorted := make([]time.Duration, len(ep.durations))
-			copy(sorted, ep.durations)
-			sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
 
+		// Copy status code and error type maps
+		for code, count := range ep.statusCodes {
+			es.StatusCodes[code] = count
+			stats.StatusCodes[code] += count
+		}
+		for errType, count := range ep.errorTypes {
+			es.ErrorTypes[errType] = count
+			stats.ErrorTypes[errType] += count
+		}
+
+		sorted := ep.reservoir.Sorted()
+		if len(sorted) > 0 {
 			es.P50 = percentile(sorted, 50)
 			es.P90 = percentile(sorted, 90)
 			es.P95 = percentile(sorted, 95)
 			es.P99 = percentile(sorted, 99)
-			es.Min = sorted[0]
-			es.Max = sorted[len(sorted)-1]
-			es.Avg = average(sorted)
+			es.Min = ep.reservoir.Min()
+			es.Max = ep.reservoir.Max()
+			if ep.reservoir.Count() > 0 {
+				es.Avg = ep.reservoir.Sum() / time.Duration(ep.reservoir.Count())
+			}
 
-			allDurations = append(allDurations, ep.durations...)
+			// Contribute to global stats
+			for _, d := range sorted {
+				globalRes.Add(d)
+			}
+			if firstGlobal {
+				globalMin = ep.reservoir.Min()
+				globalMax = ep.reservoir.Max()
+				firstGlobal = false
+			} else {
+				if ep.reservoir.Min() < globalMin {
+					globalMin = ep.reservoir.Min()
+				}
+				if ep.reservoir.Max() > globalMax {
+					globalMax = ep.reservoir.Max()
+				}
+			}
+			globalSum += ep.reservoir.Sum()
+			globalCount += ep.reservoir.Count()
 		}
+
 		stats.PerEndpoint[name] = es
 		stats.TotalRequests += total
 		stats.SuccessCount += ep.successes
 		stats.ErrorCount += ep.errors
 	}
 
-	if len(allDurations) > 0 {
-		sort.Slice(allDurations, func(i, j int) bool { return allDurations[i] < allDurations[j] })
-		stats.P50 = percentile(allDurations, 50)
-		stats.P90 = percentile(allDurations, 90)
-		stats.P95 = percentile(allDurations, 95)
-		stats.P99 = percentile(allDurations, 99)
-		stats.Min = allDurations[0]
-		stats.Max = allDurations[len(allDurations)-1]
-		stats.Avg = average(allDurations)
+	if globalRes.Count() > 0 {
+		globalSorted := globalRes.Sorted()
+		stats.P50 = percentile(globalSorted, 50)
+		stats.P90 = percentile(globalSorted, 90)
+		stats.P95 = percentile(globalSorted, 95)
+		stats.P99 = percentile(globalSorted, 99)
+		stats.Min = globalMin
+		stats.Max = globalMax
+		if globalCount > 0 {
+			stats.Avg = globalSum / time.Duration(globalCount)
+		}
 	}
 
 	if elapsed.Seconds() > 0 {
@@ -168,15 +245,4 @@ func percentile(sorted []time.Duration, p float64) time.Duration {
 	}
 	idx := int(float64(len(sorted)-1) * p / 100.0)
 	return sorted[idx]
-}
-
-func average(durations []time.Duration) time.Duration {
-	if len(durations) == 0 {
-		return 0
-	}
-	var sum time.Duration
-	for _, d := range durations {
-		sum += d
-	}
-	return sum / time.Duration(len(durations))
 }

@@ -102,6 +102,76 @@
     </table>
 </div>
 {{end}}
+
+{{if .Stats.ThresholdResults}}
+<div class="card">
+    <h2>Threshold Results</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Threshold</th>
+                <th>Actual</th>
+                <th>Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Stats.ThresholdResults}}
+            <tr>
+                <td>{{.Name}}</td>
+                <td>{{.Threshold}}</td>
+                <td>{{.Actual}}</td>
+                <td>{{if .Passed}}<span class="badge badge-completed">PASS</span>{{else}}<span class="badge badge-failed">FAIL</span>{{end}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
+
+{{if .Stats.StatusCodes}}
+<div class="card">
+    <h2>Status Code Breakdown</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Status Code</th>
+                <th class="num">Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range $code, $count := .Stats.StatusCodes}}
+            <tr>
+                <td>{{$code}}</td>
+                <td class="num">{{$count}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
+
+{{if .Stats.ErrorTypes}}
+<div class="card">
+    <h2>Error Type Breakdown</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Error Type</th>
+                <th class="num">Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range $errType, $count := .Stats.ErrorTypes}}
+            <tr>
+                <td>{{$errType}}</td>
+                <td class="num">{{$count}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
 {{else}}
 <div class="card">
     <p>No stats available for this test.</p>

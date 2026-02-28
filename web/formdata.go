@@ -46,6 +46,13 @@ type FormData struct {
 	OutputInterval string
 	OutputFile     string
 
+	// Thresholds (optional)
+	ThresholdP95        string
+	ThresholdP99        string
+	ThresholdMaxLatency string
+	ThresholdErrorRate  string
+	ThresholdMinRPS     string
+
 	// Validation errors (set by server, not submitted)
 	Errors []string
 }
@@ -123,6 +130,12 @@ func ParseFormData(r *http.Request) *FormData {
 		OutputFormat:   r.FormValue("output_format"),
 		OutputInterval: r.FormValue("output_interval"),
 		OutputFile:     r.FormValue("output_file"),
+
+		ThresholdP95:        r.FormValue("threshold_p95"),
+		ThresholdP99:        r.FormValue("threshold_p99"),
+		ThresholdMaxLatency: r.FormValue("threshold_max_latency"),
+		ThresholdErrorRate:  r.FormValue("threshold_error_rate"),
+		ThresholdMinRPS:     r.FormValue("threshold_min_rps"),
 	}
 
 	if fd.Mode == "" {
@@ -331,6 +344,43 @@ func (fd *FormData) ToConfig() (*config.Config, error) {
 		cfg.Output.Interval = config.Duration{Duration: d}
 	}
 	cfg.Output.File = fd.OutputFile
+
+	// Thresholds
+	if fd.ThresholdP95 != "" {
+		d, err := time.ParseDuration(fd.ThresholdP95)
+		if err != nil {
+			return nil, fmt.Errorf("invalid threshold p95 %q: %w", fd.ThresholdP95, err)
+		}
+		cfg.Thresholds.P95 = config.Duration{Duration: d}
+	}
+	if fd.ThresholdP99 != "" {
+		d, err := time.ParseDuration(fd.ThresholdP99)
+		if err != nil {
+			return nil, fmt.Errorf("invalid threshold p99 %q: %w", fd.ThresholdP99, err)
+		}
+		cfg.Thresholds.P99 = config.Duration{Duration: d}
+	}
+	if fd.ThresholdMaxLatency != "" {
+		d, err := time.ParseDuration(fd.ThresholdMaxLatency)
+		if err != nil {
+			return nil, fmt.Errorf("invalid threshold max latency %q: %w", fd.ThresholdMaxLatency, err)
+		}
+		cfg.Thresholds.MaxLatency = config.Duration{Duration: d}
+	}
+	if fd.ThresholdErrorRate != "" {
+		f, err := strconv.ParseFloat(fd.ThresholdErrorRate, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid threshold error rate %q: %w", fd.ThresholdErrorRate, err)
+		}
+		cfg.Thresholds.ErrorRate = f
+	}
+	if fd.ThresholdMinRPS != "" {
+		f, err := strconv.ParseFloat(fd.ThresholdMinRPS, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid threshold min RPS %q: %w", fd.ThresholdMinRPS, err)
+		}
+		cfg.Thresholds.MinRPS = f
+	}
 
 	// Apply defaults and normalize (same as config.Load does after YAML parse)
 	cfg.ApplyDefaults()

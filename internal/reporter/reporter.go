@@ -74,7 +74,41 @@ func Summary(w io.Writer, stats *metrics.Stats) {
 			)
 		}
 	}
+
+	if len(stats.StatusCodes) > 0 {
+		fmt.Fprintln(w, strings.Repeat("─", 65))
+		fmt.Fprintln(w, "  Status Code Breakdown:")
+		fmt.Fprintf(w, "  %-12s %10s\n", "Status", "Count")
+		for _, code := range sortedIntKeys(stats.StatusCodes) {
+			fmt.Fprintf(w, "  %-12d %10d\n", code, stats.StatusCodes[code])
+		}
+	}
+
+	if len(stats.ErrorTypes) > 0 {
+		fmt.Fprintln(w, strings.Repeat("─", 65))
+		fmt.Fprintln(w, "  Error Type Breakdown:")
+		fmt.Fprintf(w, "  %-20s %10s\n", "Type", "Count")
+		for _, errType := range sortedStringKeys(stats.ErrorTypes) {
+			fmt.Fprintf(w, "  %-20s %10d\n", errType, stats.ErrorTypes[errType])
+		}
+	}
+
 	fmt.Fprintln(w, strings.Repeat("═", 65))
+}
+
+// ThresholdSummary writes the threshold evaluation results table.
+func ThresholdSummary(w io.Writer, results []metrics.ThresholdResult) {
+	fmt.Fprintln(w, strings.Repeat("─", 65))
+	fmt.Fprintln(w, "  Threshold Results:")
+	fmt.Fprintf(w, "  %-16s %-18s %-14s %s\n", "Metric", "Threshold", "Actual", "Result")
+	fmt.Fprintln(w, "  "+strings.Repeat("─", 60))
+	for _, r := range results {
+		status := "PASS"
+		if !r.Passed {
+			status = "FAIL"
+		}
+		fmt.Fprintf(w, "  %-16s %-18s %-14s %s\n", r.Name, r.Threshold, r.Actual, status)
+	}
 }
 
 // WriteJSON writes the stats snapshot as JSON to the given file path.
@@ -114,6 +148,24 @@ func formatDuration(d time.Duration) string {
 }
 
 func sortedKeys(m map[string]*metrics.EndpointStats) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sortedIntKeys(m map[int]int64) []int {
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	return keys
+}
+
+func sortedStringKeys(m map[string]int64) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

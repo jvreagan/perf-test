@@ -108,7 +108,19 @@ func (e *Engine) Run(ctx context.Context, w io.Writer) (*metrics.Stats, error) {
 
 	// Final report
 	finalStats := collector.Snapshot()
+
+	// Evaluate thresholds if configured
+	if e.cfg.Thresholds.HasThresholds() {
+		thresholdResults := metrics.EvaluateThresholds(e.cfg.Thresholds, finalStats)
+		finalStats.ThresholdResults = thresholdResults
+	}
+
 	reporter.Summary(w, finalStats)
+
+	// Print threshold summary if results exist
+	if len(finalStats.ThresholdResults) > 0 {
+		reporter.ThresholdSummary(w, finalStats.ThresholdResults)
+	}
 
 	// Write JSON if configured
 	if e.cfg.Output.File != "" {
@@ -119,6 +131,21 @@ func (e *Engine) Run(ctx context.Context, w io.Writer) (*metrics.Stats, error) {
 		}
 	}
 
+	// Return logic: thresholds take precedence when configured
+	if e.cfg.Thresholds.HasThresholds() {
+		if metrics.AnyFailed(finalStats.ThresholdResults) {
+			failed := 0
+			for _, r := range finalStats.ThresholdResults {
+				if !r.Passed {
+					failed++
+				}
+			}
+			return finalStats, fmt.Errorf("%d threshold(s) breached", failed)
+		}
+		return finalStats, nil
+	}
+
+	// Legacy behavior: error if any requests failed
 	if finalStats.ErrorCount > 0 {
 		return finalStats, fmt.Errorf("test completed with %d errors out of %d requests", finalStats.ErrorCount, finalStats.TotalRequests)
 	}

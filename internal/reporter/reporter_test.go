@@ -27,6 +27,8 @@ func sampleStats() *metrics.Stats {
 		Avg:           60 * time.Millisecond,
 		ActiveVUs:     10,
 		Elapsed:       5 * time.Second,
+		StatusCodes:   map[int]int64{200: 490, 500: 10},
+		ErrorTypes:    map[string]int64{"status_mismatch": 8, "timeout": 2},
 		PerEndpoint: map[string]*metrics.EndpointStats{
 			"GET /users": {
 				Name:          "GET /users",
@@ -36,6 +38,8 @@ func sampleStats() *metrics.Stats {
 				P50:           40 * time.Millisecond,
 				P90:           100 * time.Millisecond,
 				P99:           280 * time.Millisecond,
+				StatusCodes:   map[int]int64{200: 395, 500: 5},
+				ErrorTypes:    map[string]int64{"status_mismatch": 5},
 			},
 			"POST /items": {
 				Name:          "POST /items",
@@ -45,6 +49,8 @@ func sampleStats() *metrics.Stats {
 				P50:           80 * time.Millisecond,
 				P90:           180 * time.Millisecond,
 				P99:           400 * time.Millisecond,
+				StatusCodes:   map[int]int64{200: 95, 500: 5},
+				ErrorTypes:    map[string]int64{"status_mismatch": 3, "timeout": 2},
 			},
 		},
 	}
@@ -70,7 +76,11 @@ func TestSummary_ContainsKeyFields(t *testing.T) {
 	Summary(&buf, stats)
 	out := buf.String()
 
-	checks := []string{"FINAL SUMMARY", "Total Requests", "Success", "Errors", "Avg RPS", "Per-Endpoint"}
+	checks := []string{
+		"FINAL SUMMARY", "Total Requests", "Success", "Errors", "Avg RPS", "Per-Endpoint",
+		"Status Code Breakdown", "200", "500",
+		"Error Type Breakdown", "status_mismatch", "timeout",
+	}
 	for _, c := range checks {
 		if !strings.Contains(out, c) {
 			t.Errorf("Summary output missing %q\nOutput:\n%s", c, out)
@@ -102,6 +112,23 @@ func TestWriteJSON_Structure(t *testing.T) {
 	}
 	if _, ok := result["PerEndpoint"]; !ok {
 		t.Error("JSON missing PerEndpoint field")
+	}
+}
+
+func TestThresholdSummary(t *testing.T) {
+	var buf bytes.Buffer
+	results := []metrics.ThresholdResult{
+		{Name: "p95 latency", Threshold: "<= 500ms", Actual: "200ms", Passed: true},
+		{Name: "error rate", Threshold: "<= 5.0%", Actual: "8.0%", Passed: false},
+	}
+	ThresholdSummary(&buf, results)
+	out := buf.String()
+
+	checks := []string{"Threshold Results", "p95 latency", "PASS", "error rate", "FAIL"}
+	for _, c := range checks {
+		if !strings.Contains(out, c) {
+			t.Errorf("ThresholdSummary output missing %q\nOutput:\n%s", c, out)
+		}
 	}
 }
 

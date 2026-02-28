@@ -339,6 +339,96 @@ endpoints:
 	}
 }
 
+func TestLoad_WithThresholds(t *testing.T) {
+	yaml := `
+name: "Threshold Test"
+load:
+  stages:
+    - duration: 10s
+      target: 5
+thresholds:
+  p95: 500ms
+  p99: 2s
+  max_latency: 5s
+  error_rate: 5
+  min_rps: 100
+endpoints:
+  - url: "http://localhost/health"
+`
+	path := writeTemp(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Thresholds.P95.Duration != 500*time.Millisecond {
+		t.Errorf("p95: expected 500ms, got %v", cfg.Thresholds.P95.Duration)
+	}
+	if cfg.Thresholds.P99.Duration != 2*time.Second {
+		t.Errorf("p99: expected 2s, got %v", cfg.Thresholds.P99.Duration)
+	}
+	if cfg.Thresholds.MaxLatency.Duration != 5*time.Second {
+		t.Errorf("max_latency: expected 5s, got %v", cfg.Thresholds.MaxLatency.Duration)
+	}
+	if cfg.Thresholds.ErrorRate != 5.0 {
+		t.Errorf("error_rate: expected 5.0, got %f", cfg.Thresholds.ErrorRate)
+	}
+	if cfg.Thresholds.MinRPS != 100.0 {
+		t.Errorf("min_rps: expected 100.0, got %f", cfg.Thresholds.MinRPS)
+	}
+	if !cfg.Thresholds.HasThresholds() {
+		t.Error("expected HasThresholds() to be true")
+	}
+}
+
+func TestLoad_BackwardCompat_NoThresholds(t *testing.T) {
+	yaml := `
+load:
+  stages:
+    - duration: 5s
+      target: 1
+endpoints:
+  - url: "http://localhost"
+`
+	path := writeTemp(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Thresholds.HasThresholds() {
+		t.Error("expected HasThresholds() to be false for config without thresholds")
+	}
+}
+
+func TestValidate_InvalidErrorRate(t *testing.T) {
+	cfg := &Config{
+		Endpoints: []Endpoint{{URL: "http://x", Weight: 1, Method: "GET", Expect: ExpectConfig{Status: 200}}},
+		Load: LoadConfig{
+			Mode:   "vu",
+			Stages: []Stage{{Duration: Duration{5 * time.Second}, Target: 1}},
+		},
+		Output:     OutputConfig{Format: "console", Interval: Duration{5 * time.Second}},
+		Thresholds: ThresholdConfig{ErrorRate: 150},
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected validation error for error_rate > 100")
+	}
+}
+
+func TestValidate_NegativeMinRPS(t *testing.T) {
+	cfg := &Config{
+		Endpoints: []Endpoint{{URL: "http://x", Weight: 1, Method: "GET", Expect: ExpectConfig{Status: 200}}},
+		Load: LoadConfig{
+			Mode:   "vu",
+			Stages: []Stage{{Duration: Duration{5 * time.Second}, Target: 1}},
+		},
+		Output:     OutputConfig{Format: "console", Interval: Duration{5 * time.Second}},
+		Thresholds: ThresholdConfig{MinRPS: -10},
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected validation error for negative min_rps")
+	}
+}
+
 func TestTotalDuration(t *testing.T) {
 	cfg := &Config{
 		Load: LoadConfig{

@@ -228,6 +228,37 @@
     <button type="submit" name="action" value="add_endpoint" class="btn btn-sm btn-outline">+ Add Endpoint</button>
 </div>
 
+{{/* ---- Thresholds ---- */}}
+<div class="card">
+    <h2>Thresholds (Optional)</h2>
+    <p style="font-size:0.85rem;color:#666;margin-bottom:0.75rem;">Set pass/fail criteria. Leave blank to skip. Error rate is a percentage (0-100).</p>
+    <div class="row">
+        <div>
+            <label for="threshold_p95">p95 Latency</label>
+            <input type="text" id="threshold_p95" name="threshold_p95" value="{{.FormData.ThresholdP95}}" placeholder="500ms">
+        </div>
+        <div>
+            <label for="threshold_p99">p99 Latency</label>
+            <input type="text" id="threshold_p99" name="threshold_p99" value="{{.FormData.ThresholdP99}}" placeholder="2s">
+        </div>
+        <div>
+            <label for="threshold_max_latency">Max Latency</label>
+            <input type="text" id="threshold_max_latency" name="threshold_max_latency" value="{{.FormData.ThresholdMaxLatency}}" placeholder="5s">
+        </div>
+    </div>
+    <div class="row">
+        <div>
+            <label for="threshold_error_rate">Max Error Rate (%)</label>
+            <input type="text" id="threshold_error_rate" name="threshold_error_rate" value="{{.FormData.ThresholdErrorRate}}" placeholder="5">
+        </div>
+        <div>
+            <label for="threshold_min_rps">Min RPS</label>
+            <input type="text" id="threshold_min_rps" name="threshold_min_rps" value="{{.FormData.ThresholdMinRPS}}" placeholder="100">
+        </div>
+        <div></div>
+    </div>
+</div>
+
 {{/* ---- Output Settings ---- */}}
 <div class="card">
     <h2>Output Settings</h2>
