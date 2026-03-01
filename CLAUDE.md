@@ -57,7 +57,7 @@ Dynamic form elements (endpoints, stages, headers, variables) use submit buttons
 
 - `FormData` — all form fields as strings, with `ParseFormData(r)` and `ToConfig()` methods
 - `State` — in-memory map of `TestRun` structs, tracks `activeID`
-- `TestRun` — holds engine, cancel func, config, status, and final stats
+- `TestRun` — holds engine, cancel func, config; status/stats/error accessed via thread-safe getters (`GetStatus()`, `GetFinalStats()`, `GetError()`, `GetFinishedAt()`)
 - `Handlers` — HTTP handlers with `State` and `Templates` dependencies
 - `Templates` — per-page template sets, each paired with layout.html
 
@@ -86,8 +86,10 @@ internal/
   worker/worker.go              VU loop: rate-limit → select endpoint → execute
   worker/executor.go            Shared HTTP execution logic (concurrency-safe)
   ratelimit/ratelimit.go        Token-bucket rate limiter (stdlib only)
-  metrics/collector.go          Thread-safe result aggregation + percentiles
-  reporter/reporter.go          Console table + JSON file output
+  metrics/collector.go          Thread-safe result aggregation + percentiles + sliding window RPS
+  metrics/reservoir.go          Bounded sample storage via Algorithm R (reservoir sampling)
+  metrics/threshold.go          Pass/fail threshold evaluation (p95, p99, max_latency, error_rate, min_rps)
+  reporter/reporter.go          Console table + JSON file output + threshold summary
   data/generator.go             ${token} template engine
 web/
   cmd/main.go                   Web UI entry point (go run ./web/cmd)
@@ -142,6 +144,13 @@ endpoints:
     weight: 1
     expect:
       status: 200
+
+thresholds:
+  p95: 500ms          # p95 latency must be <= this
+  p99: 1s             # p99 latency must be <= this
+  max_latency: 2s     # max latency must be <= this
+  error_rate: 5.0     # error percentage must be <= this (0-100)
+  min_rps: 10.0       # average RPS must be >= this
 
 output:
   format: console   # "console", "json", or "csv"
@@ -222,6 +231,8 @@ so `${base_url}` style tokens survive as template tokens.
 | `max_rps > 0` with `mode: arrival_rate` | `load.max_rps is only valid in vu mode` |
 | `max_rps < 0` | `load.max_rps must be >= 0` |
 | Invalid output format | `output.format must be one of: console, json, csv` |
+| `error_rate > 100` | `thresholds.error_rate must be between 0 and 100` |
+| `min_rps < 0` | `thresholds.min_rps must be >= 0` |
 
 ---
 
@@ -252,8 +263,9 @@ Good APIs to test against (no auth required, light use only):
 
 ## Observed Behavior Notes
 
-- **RPS shown in periodic reports is cumulative average** (total requests / elapsed seconds),
-  not instantaneous. Instantaneous rate is higher at end of a ramp.
+- **Periodic reports and web UI show instantaneous RPS** via a 10-second sliding window.
+  Final summary and results page show cumulative average RPS (total requests / elapsed).
+- **Thresholds exit non-zero** when any threshold is breached, enabling CI/CD gating.
 - **httpbin.org avg latency**: ~85–170ms p50 from US; p99 can spike to 600ms+
 - **think_time interacts with response time**: effective per-VU rate =
   `1 / (think_time + actual_response_time)`, not `1 / think_time`
@@ -290,6 +302,47 @@ Server-rendered web UI with zero JavaScript:
 - Config methods `ApplyDefaults()` and `NormalizeStages()` exported for web layer reuse
 - 30 tests (unit + integration) using `net/http/httptest`
 
+### v0.3.0 — Thresholds, Error Categorization, Race Fixes, InstantRPS (2026-03-01)
+
+**Thresholds & Pass/Fail:**
+- New `thresholds` config section: `p95`, `p99`, `max_latency`, `error_rate`, `min_rps`
+- `EvaluateThresholds()` evaluates stats against configured thresholds at test end
+- CLI exits non-zero when any threshold is breached (enables CI/CD gating)
+- Threshold results table printed after final summary; included in JSON output
+- Web UI results page shows pass/fail badge per threshold
+
+**Error Categorization:**
+- Status codes tracked per-endpoint and globally (e.g., `200: 490, 500: 10`)
+- Errors classified by type: `status_mismatch`, `timeout`, `connection_refused`, `dns_error`, `tls_error`, `other`
+- Breakdown displayed in final summary, web results page, and live running page
+
+**Reservoir Sampling (bounded memory):**
+- Replaced unbounded latency slice with Algorithm R reservoir sampling (`metrics/reservoir.go`)
+- `DefaultReservoirSize = 10,000` — O(1) memory regardless of request count
+- Exact min/max/sum/count tracked separately from sampled buffer
+- Percentiles computed from bounded sorted sample
+
+**Race Condition Fixes:**
+- `TestRun` fields (`status`, `finalStats`, `err`, `finishedAt`) protected by `sync.RWMutex`; accessed via `GetStatus()`, `GetFinalStats()`, `GetError()`, `GetFinishedAt()`
+- `Engine.Collector()` protected by `sync.Mutex` (concurrent reads during live test)
+- Arrival rate mode: `sync.WaitGroup` tracks in-flight goroutines, preventing send-on-closed-channel panic at shutdown
+- `bytes.Buffer` replaced with `io.Discard` for web test runs (buffer was never read)
+- `handleTestStop()` sleep removed (redirect to auto-refreshing page instead)
+
+**Instantaneous RPS:**
+- 10-second sliding window ring buffer in `Collector` (`recentCounts [10]int64`)
+- `InstantRPS` field added to `Stats` struct
+- Periodic reporter and web running page show instantaneous RPS
+- Final summary and results page continue showing cumulative average RPS
+
+**Unbounded Body Read Fix:**
+- `io.ReadAll(resp.Body)` replaced with `io.Copy(io.Discard, resp.Body)` in executor
+- Streams and discards response body without buffering (prevents OOM on large responses)
+
+**Test Coverage:**
+- Expanded from ~30 tests to 188 tests (including subtests)
+- New test areas: InstantRPS sliding window, TestRun accessor concurrency, Engine.Collector() mutex, arrival rate shutdown safety, executor io.Copy/edge cases, State lifecycle, web API integration, reporter InstantRPS/edge cases
+
 ### Live Test Run (2026-02-21)
 Ran a 2-minute ramp from 0.1 RPS → 1 RPS against httpbin.org/get:
 - Config: VU mode, `think_time: 9s`, 1→10 VUs over 2 minutes
@@ -305,5 +358,5 @@ Ran a 2-minute ramp from 0.1 RPS → 1 RPS against httpbin.org/get:
 
 ---
 
-**Last Updated**: 2026-02-26
-**Status**: v0.2.0 ✅
+**Last Updated**: 2026-03-01
+**Status**: v0.3.0 ✅
