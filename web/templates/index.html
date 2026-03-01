@@ -24,11 +24,11 @@
         <li>
             <div>
                 <span class="test-name">{{.Config.Name}}</span>
-                {{if eq .Status "completed"}}<span class="badge badge-completed">completed</span>
-                {{else if eq .Status "failed"}}<span class="badge badge-failed">failed</span>
-                {{else if eq .Status "stopped"}}<span class="badge badge-stopped">stopped</span>{{end}}
+                {{if eq .GetStatus "completed"}}<span class="badge badge-completed">completed</span>
+                {{else if eq .GetStatus "failed"}}<span class="badge badge-failed">failed</span>
+                {{else if eq .GetStatus "stopped"}}<span class="badge badge-stopped">stopped</span>{{end}}
                 <div class="test-meta">
-                    {{if .FinalStats}}{{.FinalStats.TotalRequests}} requests | {{fmtElapsed .FinalStats.Elapsed}}{{end}}
+                    {{if .GetFinalStats}}{{.GetFinalStats.TotalRequests}} requests | {{fmtElapsed .GetFinalStats.Elapsed}}{{end}}
                 </div>
             </div>
             <a href="/test/{{.ID}}" class="btn btn-sm btn-outline">View</a>

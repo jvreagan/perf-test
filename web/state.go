@@ -1,10 +1,10 @@
 package web
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"sync"
 	"time"
 
@@ -15,16 +15,45 @@ import (
 
 // TestRun represents a single load test execution.
 type TestRun struct {
-	ID         string
-	Config     *config.Config
-	StartedAt  time.Time
-	FinishedAt time.Time
-	Status     string // "running", "completed", "failed", "stopped"
-	Engine     *engine.Engine
-	Cancel     context.CancelFunc
-	FinalStats *metrics.Stats
-	Error      error
-	Output     *bytes.Buffer
+	ID        string
+	Config    *config.Config
+	StartedAt time.Time
+	Engine    *engine.Engine
+	Cancel    context.CancelFunc
+
+	mu         sync.RWMutex
+	finishedAt time.Time
+	status     string // "running", "completed", "failed", "stopped"
+	finalStats *metrics.Stats
+	err        error
+}
+
+// GetStatus returns the test run status thread-safely.
+func (tr *TestRun) GetStatus() string {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
+	return tr.status
+}
+
+// GetFinalStats returns the final stats snapshot thread-safely.
+func (tr *TestRun) GetFinalStats() *metrics.Stats {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
+	return tr.finalStats
+}
+
+// GetError returns the test run error thread-safely.
+func (tr *TestRun) GetError() error {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
+	return tr.err
+}
+
+// GetFinishedAt returns the time the test finished thread-safely.
+func (tr *TestRun) GetFinishedAt() time.Time {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
+	return tr.finishedAt
 }
 
 // State manages in-memory test run state.
@@ -67,7 +96,7 @@ func (s *State) RecentTests(limit int) []*TestRun {
 	var result []*TestRun
 	for i := len(s.order) - 1; i >= 0 && len(result) < limit; i-- {
 		tr := s.tests[s.order[i]]
-		if tr.Status != "running" {
+		if tr.GetStatus() != "running" {
 			result = append(result, tr)
 		}
 	}
@@ -85,17 +114,15 @@ func (s *State) StartTest(cfg *config.Config) *TestRun {
 
 	id := generateID()
 	ctx, cancel := context.WithCancel(context.Background())
-	buf := new(bytes.Buffer)
 	eng := engine.New(cfg)
 
 	run := &TestRun{
 		ID:        id,
 		Config:    cfg,
 		StartedAt: time.Now(),
-		Status:    "running",
+		status:    "running",
 		Engine:    eng,
 		Cancel:    cancel,
-		Output:    buf,
 	}
 
 	s.tests[id] = run
@@ -104,17 +131,21 @@ func (s *State) StartTest(cfg *config.Config) *TestRun {
 	s.mu.Unlock()
 
 	go func() {
-		stats, err := eng.Run(ctx, buf)
-		run.FinishedAt = time.Now()
-		run.FinalStats = stats
-		run.Error = err
+		stats, err := eng.Run(ctx, io.Discard)
+
+		run.mu.Lock()
+		run.finishedAt = time.Now()
+		run.finalStats = stats
+		run.err = err
 		if ctx.Err() != nil {
-			run.Status = "stopped"
+			run.status = "stopped"
 		} else if err != nil {
-			run.Status = "failed"
+			run.status = "failed"
 		} else {
-			run.Status = "completed"
+			run.status = "completed"
 		}
+		run.mu.Unlock()
+
 		s.mu.Lock()
 		s.activeID = ""
 		s.mu.Unlock()
@@ -128,7 +159,7 @@ func (s *State) StopTest(id string) {
 	s.mu.RLock()
 	tr := s.tests[id]
 	s.mu.RUnlock()
-	if tr != nil && tr.Status == "running" && tr.Cancel != nil {
+	if tr != nil && tr.GetStatus() == "running" && tr.Cancel != nil {
 		tr.Cancel()
 	}
 }

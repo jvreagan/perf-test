@@ -99,8 +99,7 @@ func (e *Executor) Execute(ctx context.Context, ep config.Endpoint) metrics.Resu
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	bytesReceived := int64(len(body))
+	bytesReceived, _ := io.Copy(io.Discard, resp.Body)
 
 	success := true
 	if ep.Expect.Status != 0 && resp.StatusCode != ep.Expect.Status {

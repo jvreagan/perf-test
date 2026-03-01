@@ -160,7 +160,7 @@ func (h *Handlers) handleTestStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if tr.Status == "running" {
+	if tr.GetStatus() == "running" {
 		var stats *metrics.Stats
 		if collector := tr.Engine.Collector(); collector != nil {
 			stats = collector.Snapshot()
@@ -189,7 +189,7 @@ func (h *Handlers) handleTestStatus(w http.ResponseWriter, r *http.Request) {
 	// Completed/failed/stopped
 	data := map[string]interface{}{
 		"TestRun": tr,
-		"Stats":   tr.FinalStats,
+		"Stats":   tr.GetFinalStats(),
 	}
 	h.render(w, "results.html", data)
 }
@@ -197,8 +197,6 @@ func (h *Handlers) handleTestStatus(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) handleTestStop(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	h.state.StopTest(id)
-	// Give the goroutine a moment to clean up
-	time.Sleep(500 * time.Millisecond)
 	http.Redirect(w, r, "/test/"+id, http.StatusSeeOther)
 }
 

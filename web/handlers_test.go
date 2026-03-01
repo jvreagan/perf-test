@@ -342,11 +342,11 @@ func TestGetTestStatus_Completed(t *testing.T) {
 	// Wait for it to complete
 	for i := 0; i < 50; i++ {
 		time.Sleep(100 * time.Millisecond)
-		if run.Status != "running" {
+		if run.GetStatus() != "running" {
 			break
 		}
 	}
-	if run.Status == "running" {
+	if run.GetStatus() == "running" {
 		t.Fatal("test did not complete in time")
 	}
 

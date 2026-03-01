@@ -22,6 +22,7 @@ import (
 // Engine orchestrates the entire load test run.
 type Engine struct {
 	cfg       *config.Config
+	mu        sync.Mutex
 	collector *metrics.Collector
 }
 
@@ -37,6 +38,8 @@ type workerEntry struct {
 
 // Collector returns the metrics collector, available after Run has started.
 func (e *Engine) Collector() *metrics.Collector {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.collector
 }
 
@@ -46,7 +49,9 @@ func (e *Engine) Run(ctx context.Context, w io.Writer) (*metrics.Stats, error) {
 	client := e.buildClient()
 	startTime := time.Now()
 	collector := metrics.NewCollector(startTime)
+	e.mu.Lock()
 	e.collector = collector
+	e.mu.Unlock()
 	gen := data.NewGenerator(e.cfg.Variables)
 
 	resultCh := make(chan metrics.Result, 1000)
@@ -198,6 +203,7 @@ func (e *Engine) runVU(ctx context.Context, exec *worker.Executor, collector *me
 func (e *Engine) runArrivalRate(ctx context.Context, exec *worker.Executor, collector *metrics.Collector, resultCh chan<- metrics.Result, targetCh <-chan int) {
 	var dispatchCancel context.CancelFunc
 	var dispatchDone chan struct{}
+	var inflightWG sync.WaitGroup
 
 	setDispatchRate := func(rps int) {
 		// Stop the previous dispatcher, if any.
@@ -231,7 +237,9 @@ func (e *Engine) runArrivalRate(ctx context.Context, exec *worker.Executor, coll
 					select {
 					case sem <- struct{}{}:
 						collector.SetActiveVUs(len(sem))
+						inflightWG.Add(1)
 						go func() {
+							defer inflightWG.Done()
 							defer func() { <-sem }()
 							ep := exec.SelectEndpoint()
 							// Use parent ctx so rate changes don't abort in-flight requests.
@@ -259,6 +267,7 @@ func (e *Engine) runArrivalRate(ctx context.Context, exec *worker.Executor, coll
 		dispatchCancel()
 		<-dispatchDone
 	}
+	inflightWG.Wait()
 }
 
 func (e *Engine) buildClient() *http.Client {

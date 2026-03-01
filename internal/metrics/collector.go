@@ -41,6 +41,7 @@ type Stats struct {
 	SuccessCount  int64
 	ErrorCount    int64
 	RPS           float64
+	InstantRPS    float64
 	P50           time.Duration
 	P90           time.Duration
 	P95           time.Duration
@@ -65,19 +66,27 @@ type endpointData struct {
 	errorTypes  map[string]int64
 }
 
+const rpsWindow = 10 // sliding window size in seconds
+
 // Collector gathers Results from concurrent workers thread-safely.
 type Collector struct {
 	mu        sync.Mutex
 	startTime time.Time
 	endpoints map[string]*endpointData
 	activeVUs int
+
+	// Sliding window for instantaneous RPS
+	recentCounts [rpsWindow]int64
+	recentIdx    int
+	recentTime   time.Time // truncated to second of last record
 }
 
 // NewCollector creates a Collector with the given start time.
 func NewCollector(start time.Time) *Collector {
 	return &Collector{
-		startTime: start,
-		endpoints: make(map[string]*endpointData),
+		startTime:  start,
+		endpoints:  make(map[string]*endpointData),
+		recentTime: start.Truncate(time.Second),
 	}
 }
 
@@ -92,6 +101,24 @@ func (c *Collector) SetActiveVUs(n int) {
 func (c *Collector) Record(r Result) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Advance sliding window ring buffer
+	now := time.Now().Truncate(time.Second)
+	if now.After(c.recentTime) {
+		elapsed := int(now.Sub(c.recentTime) / time.Second)
+		if elapsed >= rpsWindow {
+			// Clear entire window
+			c.recentCounts = [rpsWindow]int64{}
+			c.recentIdx = 0
+		} else {
+			for i := 0; i < elapsed; i++ {
+				c.recentIdx = (c.recentIdx + 1) % rpsWindow
+				c.recentCounts[c.recentIdx] = 0
+			}
+		}
+		c.recentTime = now
+	}
+	c.recentCounts[c.recentIdx]++
 
 	ep, ok := c.endpoints[r.EndpointName]
 	if !ok {
@@ -234,6 +261,30 @@ func (c *Collector) Snapshot() *Stats {
 
 	if elapsed.Seconds() > 0 {
 		stats.RPS = float64(stats.TotalRequests) / elapsed.Seconds()
+	}
+
+	// Compute instantaneous RPS from sliding window
+	now := time.Now().Truncate(time.Second)
+	windowElapsed := int(now.Sub(c.recentTime) / time.Second)
+	if windowElapsed < rpsWindow {
+		var sum int64
+		validBuckets := 0
+		for i := 0; i < rpsWindow; i++ {
+			idx := (c.recentIdx - i + rpsWindow) % rpsWindow
+			age := i + windowElapsed
+			if age >= rpsWindow {
+				break
+			}
+			sum += c.recentCounts[idx]
+			validBuckets++
+		}
+		if validBuckets > 0 {
+			span := validBuckets + windowElapsed
+			if span > rpsWindow {
+				span = rpsWindow
+			}
+			stats.InstantRPS = float64(sum) / float64(span)
+		}
 	}
 
 	return stats

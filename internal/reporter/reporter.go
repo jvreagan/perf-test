@@ -21,7 +21,7 @@ func Print(w io.Writer, stats *metrics.Stats) {
 
 	elapsed := formatDuration(stats.Elapsed)
 	fmt.Fprintf(w, "\n[ %s ] VUs: %d  RPS: %.1f  Reqs: %d  Errors: %d (%.1f%%)\n",
-		elapsed, stats.ActiveVUs, stats.RPS, stats.TotalRequests, stats.ErrorCount, errPct)
+		elapsed, stats.ActiveVUs, stats.InstantRPS, stats.TotalRequests, stats.ErrorCount, errPct)
 	fmt.Fprintln(w, strings.Repeat("─", 65))
 	fmt.Fprintf(w, "%-30s %6s  %8s  %8s  %8s\n", "Endpoint", "Reqs", "p50", "p90", "p99")
 	fmt.Fprintln(w, strings.Repeat("─", 65))

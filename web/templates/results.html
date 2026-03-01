@@ -4,14 +4,14 @@
 
 {{define "content"}}
 <h1>{{.TestRun.Config.Name}}
-    {{if eq .TestRun.Status "completed"}}<span class="badge badge-completed">completed</span>
-    {{else if eq .TestRun.Status "failed"}}<span class="badge badge-failed">failed</span>
-    {{else if eq .TestRun.Status "stopped"}}<span class="badge badge-stopped">stopped</span>{{end}}
+    {{if eq .TestRun.GetStatus "completed"}}<span class="badge badge-completed">completed</span>
+    {{else if eq .TestRun.GetStatus "failed"}}<span class="badge badge-failed">failed</span>
+    {{else if eq .TestRun.GetStatus "stopped"}}<span class="badge badge-stopped">stopped</span>{{end}}
 </h1>
 
-{{if .TestRun.Error}}
+{{if .TestRun.GetError}}
 <div class="errors">
-    <strong>Test error:</strong> {{.TestRun.Error}}
+    <strong>Test error:</strong> {{.TestRun.GetError}}
 </div>
 {{end}}
 
