@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"sort"
 	"strings"
@@ -51,7 +51,7 @@ func (e *Executor) SelectEndpoint() config.Endpoint {
 	if len(e.endpoints) == 1 {
 		return e.endpoints[0]
 	}
-	r := rand.Intn(e.totalWeight)
+	r := rand.IntN(e.totalWeight)
 	idx := sort.SearchInts(e.cumWeights, r+1)
 	if idx >= len(e.endpoints) {
 		idx = len(e.endpoints) - 1
@@ -82,6 +82,11 @@ func (e *Executor) Execute(ctx context.Context, ep config.Endpoint) metrics.Resu
 
 	for k, v := range ep.Headers {
 		req.Header.Set(k, e.gen.Generate(v))
+	}
+
+	// Set default Content-Type for requests with a body if not already set.
+	if ep.Body != "" && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	start := time.Now()

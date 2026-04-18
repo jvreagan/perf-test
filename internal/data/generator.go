@@ -2,10 +2,9 @@ package data
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"math/big"
-	mathrand "math/rand"
+	mathrand "math/rand/v2"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,7 +40,7 @@ func (g *Generator) evaluate(token string) string {
 	case token == "random.email":
 		return randomEmail()
 	case token == "random.bool":
-		if mathrand.Intn(2) == 0 {
+		if mathrand.IntN(2) == 0 {
 			return "true"
 		}
 		return "false"
@@ -93,7 +92,7 @@ func (g *Generator) evalRandomInt(token string) string {
 	if err1 != nil || err2 != nil || max < min {
 		return match(token)
 	}
-	return strconv.FormatInt(min+mathrand.Int63n(max-min+1), 10)
+	return strconv.FormatInt(min+mathrand.Int64N(max-min+1), 10)
 }
 
 func (g *Generator) evalRandomFloat(token string) string {
@@ -137,7 +136,7 @@ func (g *Generator) evalRandomChoice(token string) string {
 	for i := range choices {
 		choices[i] = strings.TrimSpace(choices[i])
 	}
-	return choices[mathrand.Intn(len(choices))]
+	return choices[mathrand.IntN(len(choices))]
 }
 
 func randomUUID() string {
@@ -152,9 +151,9 @@ func randomUUID() string {
 func randomEmail() string {
 	words := []string{"alice", "bob", "carol", "dave", "eve", "frank", "grace", "hank"}
 	domains := []string{"example.com", "test.org", "mail.net", "demo.io"}
-	w := words[mathrand.Intn(len(words))]
+	w := words[mathrand.IntN(len(words))]
 	n, _ := rand.Int(rand.Reader, big.NewInt(9000))
-	d := domains[mathrand.Intn(len(domains))]
+	d := domains[mathrand.IntN(len(domains))]
 	return fmt.Sprintf("%s%d@%s", w, n.Int64()+1000, d)
 }
 
@@ -162,18 +161,10 @@ const alphanumeric = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345
 
 func randomAlphanumeric(n int) string {
 	b := make([]byte, n)
-	_, _ = rand.Read(b)
 	for i := range b {
-		b[i] = alphanumeric[int(b[i])%len(alphanumeric)]
+		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(alphanumeric))))
+		b[i] = alphanumeric[idx.Int64()]
 	}
 	return string(b)
 }
 
-// randomHex generates a random hex string of length n.
-func randomHex(n int) string {
-	b := make([]byte, (n+1)/2)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)[:n]
-}
-
-var _ = randomHex // used for potential future use

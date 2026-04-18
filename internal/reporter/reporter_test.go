@@ -143,18 +143,18 @@ func TestFmtDur(t *testing.T) {
 		{2 * time.Second, "2.00s"},
 	}
 	for _, tc := range tests {
-		got := fmtDur(tc.d)
+		got := FmtDur(tc.d)
 		if got != tc.want {
-			t.Errorf("fmtDur(%v) = %q, want %q", tc.d, got, tc.want)
+			t.Errorf("FmtDur(%v) = %q, want %q", tc.d, got, tc.want)
 		}
 	}
 }
 
 func TestFormatDuration(t *testing.T) {
-	if got := formatDuration(90 * time.Second); got != "01:30" {
+	if got := FormatElapsed(90 * time.Second); got != "01:30" {
 		t.Errorf("expected 01:30, got %q", got)
 	}
-	if got := formatDuration(3661 * time.Second); got != "01:01:01" {
+	if got := FormatElapsed(3661 * time.Second); got != "01:01:01" {
 		t.Errorf("expected 01:01:01, got %q", got)
 	}
 }

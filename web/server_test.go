@@ -186,9 +186,9 @@ func TestStopTest_Integration(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Stop it
-	resp, err = client.Get(ts.URL + testURL + "/stop")
+	resp, err = client.Post(ts.URL+testURL+"/stop", "", nil)
 	if err != nil {
-		t.Fatalf("GET stop: %v", err)
+		t.Fatalf("POST stop: %v", err)
 	}
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Errorf("expected 303 redirect, got %d", resp.StatusCode)
@@ -368,10 +368,10 @@ func TestStopEndpoint_ImmediateRedirect(t *testing.T) {
 
 	// Time the stop endpoint — should be fast (no 500ms sleep)
 	start := time.Now()
-	resp, err := client.Get(ts.URL + testURL + "/stop")
+	resp, err := client.Post(ts.URL+testURL+"/stop", "", nil)
 	elapsed := time.Since(start)
 	if err != nil {
-		t.Fatalf("GET stop: %v", err)
+		t.Fatalf("POST stop: %v", err)
 	}
 	resp.Body.Close()
 
@@ -447,7 +447,7 @@ func TestConfigure_RedirectsWhenTestRunning(t *testing.T) {
 	}
 
 	// Clean up
-	client.Get(ts.URL + testURL + "/stop")
+	client.Post(ts.URL+testURL+"/stop", "", nil)
 }
 
 func TestTestStatus_404ForNonexistent(t *testing.T) {

@@ -73,6 +73,7 @@ type Collector struct {
 	mu        sync.Mutex
 	startTime time.Time
 	endpoints map[string]*endpointData
+	global    *Reservoir // global reservoir maintained alongside per-endpoint
 	activeVUs int
 
 	// Sliding window for instantaneous RPS
@@ -86,6 +87,7 @@ func NewCollector(start time.Time) *Collector {
 	return &Collector{
 		startTime:  start,
 		endpoints:  make(map[string]*endpointData),
+		global:     NewReservoir(DefaultReservoirSize),
 		recentTime: start.Truncate(time.Second),
 	}
 }
@@ -130,6 +132,7 @@ func (c *Collector) Record(r Result) {
 		c.endpoints[r.EndpointName] = ep
 	}
 	ep.reservoir.Add(r.Duration)
+	c.global.Add(r.Duration)
 	ep.bytes += r.BytesReceived
 
 	if r.StatusCode > 0 {
@@ -180,12 +183,6 @@ func (c *Collector) Snapshot() *Stats {
 		ErrorTypes:  make(map[string]int64),
 	}
 
-	// For global stats, merge all reservoir buffers into a temporary reservoir.
-	globalRes := NewReservoir(DefaultReservoirSize)
-	var globalMin, globalMax, globalSum time.Duration
-	var globalCount int64
-	firstGlobal := true
-
 	for name, ep := range c.endpoints {
 		total := ep.successes + ep.errors
 		es := &EndpointStats{
@@ -219,25 +216,6 @@ func (c *Collector) Snapshot() *Stats {
 			if ep.reservoir.Count() > 0 {
 				es.Avg = ep.reservoir.Sum() / time.Duration(ep.reservoir.Count())
 			}
-
-			// Contribute to global stats
-			for _, d := range sorted {
-				globalRes.Add(d)
-			}
-			if firstGlobal {
-				globalMin = ep.reservoir.Min()
-				globalMax = ep.reservoir.Max()
-				firstGlobal = false
-			} else {
-				if ep.reservoir.Min() < globalMin {
-					globalMin = ep.reservoir.Min()
-				}
-				if ep.reservoir.Max() > globalMax {
-					globalMax = ep.reservoir.Max()
-				}
-			}
-			globalSum += ep.reservoir.Sum()
-			globalCount += ep.reservoir.Count()
 		}
 
 		stats.PerEndpoint[name] = es
@@ -246,17 +224,16 @@ func (c *Collector) Snapshot() *Stats {
 		stats.ErrorCount += ep.errors
 	}
 
-	if globalRes.Count() > 0 {
-		globalSorted := globalRes.Sorted()
+	// Global percentiles from the maintained global reservoir
+	if c.global.Count() > 0 {
+		globalSorted := c.global.Sorted()
 		stats.P50 = percentile(globalSorted, 50)
 		stats.P90 = percentile(globalSorted, 90)
 		stats.P95 = percentile(globalSorted, 95)
 		stats.P99 = percentile(globalSorted, 99)
-		stats.Min = globalMin
-		stats.Max = globalMax
-		if globalCount > 0 {
-			stats.Avg = globalSum / time.Duration(globalCount)
-		}
+		stats.Min = c.global.Min()
+		stats.Max = c.global.Max()
+		stats.Avg = c.global.Sum() / time.Duration(c.global.Count())
 	}
 
 	if elapsed.Seconds() > 0 {

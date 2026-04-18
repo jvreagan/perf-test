@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -47,6 +46,7 @@ func (e *Engine) Collector() *metrics.Collector {
 // returns the final stats snapshot. A non-nil error indicates test failures.
 func (e *Engine) Run(ctx context.Context, w io.Writer) (*metrics.Stats, error) {
 	client := e.buildClient()
+	defer client.CloseIdleConnections()
 	startTime := time.Now()
 	collector := metrics.NewCollector(startTime)
 	e.mu.Lock()
@@ -130,7 +130,7 @@ func (e *Engine) Run(ctx context.Context, w io.Writer) (*metrics.Stats, error) {
 	// Write JSON if configured
 	if e.cfg.Output.File != "" {
 		if err := reporter.WriteJSON(e.cfg.Output.File, finalStats); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to write results file: %v\n", err)
+			fmt.Fprintf(w, "Warning: failed to write results file: %v\n", err)
 		} else {
 			fmt.Fprintf(w, "Results written to: %s\n", e.cfg.Output.File)
 		}
@@ -280,11 +280,6 @@ func (e *Engine) buildClient() *http.Client {
 		},
 	}
 
-	redirectPolicy := http.ErrUseLastResponse
-	if e.cfg.HTTP.FollowRedirects {
-		redirectPolicy = nil
-	}
-
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   e.cfg.HTTP.Timeout.Duration,
@@ -292,7 +287,7 @@ func (e *Engine) buildClient() *http.Client {
 
 	if !e.cfg.HTTP.FollowRedirects {
 		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			return redirectPolicy
+			return http.ErrUseLastResponse
 		}
 	}
 

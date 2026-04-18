@@ -19,7 +19,7 @@ func Print(w io.Writer, stats *metrics.Stats) {
 		errPct = float64(stats.ErrorCount) / float64(stats.TotalRequests) * 100
 	}
 
-	elapsed := formatDuration(stats.Elapsed)
+	elapsed := FormatElapsed(stats.Elapsed)
 	fmt.Fprintf(w, "\n[ %s ] VUs: %d  RPS: %.1f  Reqs: %d  Errors: %d (%.1f%%)\n",
 		elapsed, stats.ActiveVUs, stats.InstantRPS, stats.TotalRequests, stats.ErrorCount, errPct)
 	fmt.Fprintln(w, strings.Repeat("─", 65))
@@ -32,9 +32,9 @@ func Print(w io.Writer, stats *metrics.Stats) {
 		fmt.Fprintf(w, "%-30s %6d  %8s  %8s  %8s\n",
 			truncate(name, 30),
 			es.TotalRequests,
-			fmtDur(es.P50),
-			fmtDur(es.P90),
-			fmtDur(es.P99),
+			FmtDur(es.P50),
+			FmtDur(es.P90),
+			FmtDur(es.P99),
 		)
 	}
 	fmt.Fprintln(w, strings.Repeat("─", 65))
@@ -45,7 +45,7 @@ func Summary(w io.Writer, stats *metrics.Stats) {
 	fmt.Fprintln(w, "\n"+strings.Repeat("═", 65))
 	fmt.Fprintln(w, "  FINAL SUMMARY")
 	fmt.Fprintln(w, strings.Repeat("═", 65))
-	fmt.Fprintf(w, "  Duration:       %s\n", formatDuration(stats.Elapsed))
+	fmt.Fprintf(w, "  Duration:       %s\n", FormatElapsed(stats.Elapsed))
 	fmt.Fprintf(w, "  Total Requests: %d\n", stats.TotalRequests)
 	fmt.Fprintf(w, "  Success:        %d\n", stats.SuccessCount)
 	fmt.Fprintf(w, "  Errors:         %d\n", stats.ErrorCount)
@@ -54,8 +54,8 @@ func Summary(w io.Writer, stats *metrics.Stats) {
 	fmt.Fprintf(w, "  %-10s  %10s  %10s  %10s  %10s\n", "Metric", "p50", "p90", "p95", "p99")
 	fmt.Fprintln(w, strings.Repeat("─", 65))
 	fmt.Fprintf(w, "  %-10s  %10s  %10s  %10s  %10s\n", "Latency",
-		fmtDur(stats.P50), fmtDur(stats.P90), fmtDur(stats.P95), fmtDur(stats.P99))
-	fmt.Fprintf(w, "  Min: %s  Max: %s  Avg: %s\n", fmtDur(stats.Min), fmtDur(stats.Max), fmtDur(stats.Avg))
+		FmtDur(stats.P50), FmtDur(stats.P90), FmtDur(stats.P95), FmtDur(stats.P99))
+	fmt.Fprintf(w, "  Min: %s  Max: %s  Avg: %s\n", FmtDur(stats.Min), FmtDur(stats.Max), FmtDur(stats.Avg))
 
 	if len(stats.PerEndpoint) > 0 {
 		fmt.Fprintln(w, strings.Repeat("─", 65))
@@ -67,9 +67,9 @@ func Summary(w io.Writer, stats *metrics.Stats) {
 			fmt.Fprintf(w, "  %-28s %6d %8s %8s %8s %8d\n",
 				truncate(name, 28),
 				es.TotalRequests,
-				fmtDur(es.P50),
-				fmtDur(es.P90),
-				fmtDur(es.P99),
+				FmtDur(es.P50),
+				FmtDur(es.P90),
+				FmtDur(es.P99),
 				es.ErrorCount,
 			)
 		}
@@ -117,14 +117,18 @@ func WriteJSON(path string, stats *metrics.Stats) error {
 	if err != nil {
 		return fmt.Errorf("creating output file: %w", err)
 	}
-	defer f.Close()
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-	return enc.Encode(stats)
+	if err := enc.Encode(stats); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
-func fmtDur(d time.Duration) string {
+// FmtDur formats a latency duration in a human-friendly way.
+func FmtDur(d time.Duration) string {
 	if d == 0 {
 		return "-"
 	}
@@ -137,7 +141,8 @@ func fmtDur(d time.Duration) string {
 	return fmt.Sprintf("%.2fs", d.Seconds())
 }
 
-func formatDuration(d time.Duration) string {
+// FormatElapsed formats an elapsed duration as MM:SS or HH:MM:SS.
+func FormatElapsed(d time.Duration) string {
 	h := int(d.Hours())
 	m := int(d.Minutes()) % 60
 	s := int(d.Seconds()) % 60

@@ -135,6 +135,9 @@ func (c *Config) ApplyDefaults() {
 	if c.HTTP.Timeout.Duration == 0 {
 		c.HTTP.Timeout = Duration{30 * time.Second}
 	}
+	// Note: FollowRedirects defaults to false (Go zero value).
+	// This is intentional for load testing — explicit redirects give more
+	// accurate latency measurements and avoid unexpected request multiplication.
 	if c.Output.Format == "" {
 		c.Output.Format = "console"
 	}
@@ -223,9 +226,9 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("stage[%d]: ramp must be \"linear\" or \"step\" (got %q)", i, s.Ramp)
 		}
 	}
-	validFormats := map[string]bool{"console": true, "json": true, "csv": true}
+	validFormats := map[string]bool{"console": true, "json": true}
 	if !validFormats[c.Output.Format] {
-		return fmt.Errorf("output.format must be one of: console, json, csv (got %q)", c.Output.Format)
+		return fmt.Errorf("output.format must be one of: console, json (got %q)", c.Output.Format)
 	}
 	if c.Thresholds.ErrorRate < 0 || c.Thresholds.ErrorRate > 100 {
 		return fmt.Errorf("thresholds.error_rate must be between 0 and 100 (got %.1f)", c.Thresholds.ErrorRate)

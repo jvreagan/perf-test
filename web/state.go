@@ -56,6 +56,8 @@ func (tr *TestRun) GetFinishedAt() time.Time {
 	return tr.finishedAt
 }
 
+const maxTestHistory = 100
+
 // State manages in-memory test run state.
 type State struct {
 	mu       sync.RWMutex
@@ -128,6 +130,15 @@ func (s *State) StartTest(cfg *config.Config) *TestRun {
 	s.tests[id] = run
 	s.order = append(s.order, id)
 	s.activeID = id
+
+	// Evict oldest completed tests if history exceeds limit
+	for len(s.order) > maxTestHistory {
+		oldID := s.order[0]
+		if oldID != s.activeID {
+			delete(s.tests, oldID)
+		}
+		s.order = s.order[1:]
+	}
 	s.mu.Unlock()
 
 	go func() {

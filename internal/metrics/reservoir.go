@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"sort"
 	"time"
 )
@@ -18,7 +18,6 @@ type Reservoir struct {
 	min   time.Duration
 	max   time.Duration
 	sum   time.Duration
-	rng   *rand.Rand
 }
 
 // NewReservoir creates a Reservoir with the given maximum size.
@@ -26,7 +25,6 @@ func NewReservoir(size int) *Reservoir {
 	return &Reservoir{
 		buf:  make([]time.Duration, 0, size),
 		size: size,
-		rng:  rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -47,11 +45,11 @@ func (r *Reservoir) Add(d time.Duration) {
 		}
 	}
 
-	if int(r.count) <= r.size {
+	if r.count <= int64(r.size) {
 		r.buf = append(r.buf, d)
 	} else {
 		// Replace with probability size/count
-		j := r.rng.Int63n(r.count)
+		j := rand.Int64N(r.count)
 		if j < int64(r.size) {
 			r.buf[j] = d
 		}

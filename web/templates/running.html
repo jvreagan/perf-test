@@ -105,7 +105,9 @@
 {{end}}
 
 <div class="actions">
-    <a href="/test/{{.TestRun.ID}}/stop" class="btn btn-danger">Stop Test</a>
+    <form method="POST" action="/test/{{.TestRun.ID}}/stop" style="display:inline">
+        <button type="submit" class="btn btn-danger">Stop Test</button>
+    </form>
     <a href="/" class="btn btn-outline">Dashboard</a>
 </div>
 {{end}}

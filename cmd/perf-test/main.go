@@ -13,7 +13,7 @@ import (
 	"github.com/jvreagan/perf-test/internal/engine"
 )
 
-var version = "0.1.0"
+var version = "0.3.0"
 
 func main() {
 	root := &cobra.Command{
