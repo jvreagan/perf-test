@@ -51,19 +51,19 @@ func TestPercentiles_KnownDataset(t *testing.T) {
 	}
 	snap := c.Snapshot()
 	// p50 index = 49 → 50ms, p90 index = 89 → 90ms, p99 index = 98 → 99ms
-	if snap.P50 != 50*time.Millisecond {
+	if snap.P50 != JSONDuration(50*time.Millisecond) {
 		t.Errorf("p50: expected 50ms, got %v", snap.P50)
 	}
-	if snap.P90 != 90*time.Millisecond {
+	if snap.P90 != JSONDuration(90*time.Millisecond) {
 		t.Errorf("p90: expected 90ms, got %v", snap.P90)
 	}
-	if snap.P99 != 99*time.Millisecond {
+	if snap.P99 != JSONDuration(99*time.Millisecond) {
 		t.Errorf("p99: expected 99ms, got %v", snap.P99)
 	}
-	if snap.Min != 1*time.Millisecond {
+	if snap.Min != JSONDuration(1*time.Millisecond) {
 		t.Errorf("min: expected 1ms, got %v", snap.Min)
 	}
-	if snap.Max != 100*time.Millisecond {
+	if snap.Max != JSONDuration(100*time.Millisecond) {
 		t.Errorf("max: expected 100ms, got %v", snap.Max)
 	}
 }

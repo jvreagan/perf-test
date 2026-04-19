@@ -18,15 +18,15 @@ func sampleStats() *metrics.Stats {
 		SuccessCount:  490,
 		ErrorCount:    10,
 		RPS:           98.0,
-		P50:           45 * time.Millisecond,
-		P90:           120 * time.Millisecond,
-		P95:           200 * time.Millisecond,
-		P99:           310 * time.Millisecond,
-		Min:           5 * time.Millisecond,
-		Max:           500 * time.Millisecond,
-		Avg:           60 * time.Millisecond,
+		P50:           metrics.JSONDuration(45 * time.Millisecond),
+		P90:           metrics.JSONDuration(120 * time.Millisecond),
+		P95:           metrics.JSONDuration(200 * time.Millisecond),
+		P99:           metrics.JSONDuration(310 * time.Millisecond),
+		Min:           metrics.JSONDuration(5 * time.Millisecond),
+		Max:           metrics.JSONDuration(500 * time.Millisecond),
+		Avg:           metrics.JSONDuration(60 * time.Millisecond),
 		ActiveVUs:     10,
-		Elapsed:       5 * time.Second,
+		Elapsed:       metrics.JSONDuration(5 * time.Second),
 		StatusCodes:   map[int]int64{200: 490, 500: 10},
 		ErrorTypes:    map[string]int64{"status_mismatch": 8, "timeout": 2},
 		PerEndpoint: map[string]*metrics.EndpointStats{
@@ -35,9 +35,9 @@ func sampleStats() *metrics.Stats {
 				TotalRequests: 400,
 				SuccessCount:  395,
 				ErrorCount:    5,
-				P50:           40 * time.Millisecond,
-				P90:           100 * time.Millisecond,
-				P99:           280 * time.Millisecond,
+				P50:           metrics.JSONDuration(40 * time.Millisecond),
+				P90:           metrics.JSONDuration(100 * time.Millisecond),
+				P99:           metrics.JSONDuration(280 * time.Millisecond),
 				StatusCodes:   map[int]int64{200: 395, 500: 5},
 				ErrorTypes:    map[string]int64{"status_mismatch": 5},
 			},
@@ -46,9 +46,9 @@ func sampleStats() *metrics.Stats {
 				TotalRequests: 100,
 				SuccessCount:  95,
 				ErrorCount:    5,
-				P50:           80 * time.Millisecond,
-				P90:           180 * time.Millisecond,
-				P99:           400 * time.Millisecond,
+				P50:           metrics.JSONDuration(80 * time.Millisecond),
+				P90:           metrics.JSONDuration(180 * time.Millisecond),
+				P99:           metrics.JSONDuration(400 * time.Millisecond),
 				StatusCodes:   map[int]int64{200: 95, 500: 5},
 				ErrorTypes:    map[string]int64{"status_mismatch": 3, "timeout": 2},
 			},
@@ -107,11 +107,11 @@ func TestWriteJSON_Structure(t *testing.T) {
 		t.Fatalf("invalid JSON output: %v", err)
 	}
 
-	if _, ok := result["TotalRequests"]; !ok {
-		t.Error("JSON missing TotalRequests field")
+	if _, ok := result["total_requests"]; !ok {
+		t.Error("JSON missing total_requests field")
 	}
-	if _, ok := result["PerEndpoint"]; !ok {
-		t.Error("JSON missing PerEndpoint field")
+	if _, ok := result["per_endpoint"]; !ok {
+		t.Error("JSON missing per_endpoint field")
 	}
 }
 
@@ -191,7 +191,7 @@ func TestPrint_EmptyPerEndpoint(t *testing.T) {
 	var buf bytes.Buffer
 	stats := &metrics.Stats{
 		TotalRequests: 0,
-		Elapsed:       1 * time.Second,
+		Elapsed:       metrics.JSONDuration(1 * time.Second),
 		ActiveVUs:     0,
 		PerEndpoint:   map[string]*metrics.EndpointStats{},
 	}
@@ -210,14 +210,14 @@ func TestSummary_NoErrors(t *testing.T) {
 		SuccessCount:  100,
 		ErrorCount:    0,
 		RPS:           10.0,
-		P50:           10 * time.Millisecond,
-		P90:           20 * time.Millisecond,
-		P95:           30 * time.Millisecond,
-		P99:           40 * time.Millisecond,
-		Min:           5 * time.Millisecond,
-		Max:           50 * time.Millisecond,
-		Avg:           15 * time.Millisecond,
-		Elapsed:       10 * time.Second,
+		P50:           metrics.JSONDuration(10 * time.Millisecond),
+		P90:           metrics.JSONDuration(20 * time.Millisecond),
+		P95:           metrics.JSONDuration(30 * time.Millisecond),
+		P99:           metrics.JSONDuration(40 * time.Millisecond),
+		Min:           metrics.JSONDuration(5 * time.Millisecond),
+		Max:           metrics.JSONDuration(50 * time.Millisecond),
+		Avg:           metrics.JSONDuration(15 * time.Millisecond),
+		Elapsed:       metrics.JSONDuration(10 * time.Second),
 		PerEndpoint:   map[string]*metrics.EndpointStats{},
 		StatusCodes:   map[int]int64{200: 100},
 		ErrorTypes:    map[string]int64{},
@@ -254,11 +254,11 @@ func TestWriteJSON_IncludesInstantRPS(t *testing.T) {
 		t.Fatalf("invalid JSON output: %v", err)
 	}
 
-	irps, ok := result["InstantRPS"]
+	irps, ok := result["instant_rps"]
 	if !ok {
-		t.Error("JSON missing InstantRPS field")
+		t.Error("JSON missing instant_rps field")
 	}
 	if irps.(float64) != 55.5 {
-		t.Errorf("expected InstantRPS 55.5, got %v", irps)
+		t.Errorf("expected instant_rps 55.5, got %v", irps)
 	}
 }

@@ -1,10 +1,42 @@
 package metrics
 
 import (
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
 )
+
+// JSONDuration wraps time.Duration with human-readable JSON marshalling.
+type JSONDuration time.Duration
+
+func (d JSONDuration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Duration(d).String())
+}
+
+func (d *JSONDuration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		// Fall back to nanosecond integer
+		var ns int64
+		if err := json.Unmarshal(b, &ns); err != nil {
+			return err
+		}
+		*d = JSONDuration(ns)
+		return nil
+	}
+	dur, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	*d = JSONDuration(dur)
+	return nil
+}
+
+// Duration returns the underlying time.Duration.
+func (d JSONDuration) Duration() time.Duration {
+	return time.Duration(d)
+}
 
 // Result holds the outcome of a single HTTP request.
 type Result struct {
@@ -19,42 +51,43 @@ type Result struct {
 
 // EndpointStats holds per-endpoint aggregated metrics.
 type EndpointStats struct {
-	Name          string
-	TotalRequests int64
-	SuccessCount  int64
-	ErrorCount    int64
-	TotalBytes    int64
-	P50           time.Duration
-	P90           time.Duration
-	P95           time.Duration
-	P99           time.Duration
-	Min           time.Duration
-	Max           time.Duration
-	Avg           time.Duration
-	StatusCodes   map[int]int64
-	ErrorTypes    map[string]int64
+	Name          string       `json:"name"`
+	TotalRequests int64        `json:"total_requests"`
+	SuccessCount  int64        `json:"success_count"`
+	ErrorCount    int64        `json:"error_count"`
+	TotalBytes    int64        `json:"total_bytes"`
+	P50           JSONDuration `json:"p50"`
+	P90           JSONDuration `json:"p90"`
+	P95           JSONDuration `json:"p95"`
+	P99           JSONDuration `json:"p99"`
+	Min           JSONDuration `json:"min"`
+	Max           JSONDuration `json:"max"`
+	Avg           JSONDuration `json:"avg"`
+	StatusCodes   map[int]int64    `json:"status_codes,omitempty"`
+	ErrorTypes    map[string]int64 `json:"error_types,omitempty"`
 }
 
 // Stats is a point-in-time snapshot of all collected metrics.
 type Stats struct {
-	TotalRequests int64
-	SuccessCount  int64
-	ErrorCount    int64
-	RPS           float64
-	InstantRPS    float64
-	P50           time.Duration
-	P90           time.Duration
-	P95           time.Duration
-	P99           time.Duration
-	Min           time.Duration
-	Max           time.Duration
-	Avg           time.Duration
-	PerEndpoint   map[string]*EndpointStats
-	ActiveVUs     int
-	Elapsed       time.Duration
-	StatusCodes      map[int]int64
-	ErrorTypes       map[string]int64
-	ThresholdResults []ThresholdResult `json:",omitempty"`
+	TotalRequests    int64                     `json:"total_requests"`
+	SuccessCount     int64                     `json:"success_count"`
+	ErrorCount       int64                     `json:"error_count"`
+	RPS              float64                   `json:"rps"`
+	InstantRPS       float64                   `json:"instant_rps"`
+	P50              JSONDuration              `json:"p50"`
+	P90              JSONDuration              `json:"p90"`
+	P95              JSONDuration              `json:"p95"`
+	P99              JSONDuration              `json:"p99"`
+	Min              JSONDuration              `json:"min"`
+	Max              JSONDuration              `json:"max"`
+	Avg              JSONDuration              `json:"avg"`
+	TotalBytes       int64                     `json:"total_bytes"`
+	PerEndpoint      map[string]*EndpointStats `json:"per_endpoint,omitempty"`
+	ActiveVUs        int                       `json:"active_vus"`
+	Elapsed          JSONDuration              `json:"elapsed"`
+	StatusCodes      map[int]int64             `json:"status_codes,omitempty"`
+	ErrorTypes       map[string]int64          `json:"error_types,omitempty"`
+	ThresholdResults []ThresholdResult         `json:"threshold_results,omitempty"`
 }
 
 type endpointData struct {
@@ -171,12 +204,13 @@ func classifyError(err error) string {
 
 // Snapshot computes and returns a point-in-time Stats snapshot.
 func (c *Collector) Snapshot() *Stats {
+	now := time.Now()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	elapsed := time.Since(c.startTime)
+	elapsed := now.Sub(c.startTime)
 	stats := &Stats{
-		Elapsed:     elapsed,
+		Elapsed:     JSONDuration(elapsed),
 		ActiveVUs:   c.activeVUs,
 		PerEndpoint: make(map[string]*EndpointStats),
 		StatusCodes: make(map[int]int64),
@@ -207,14 +241,14 @@ func (c *Collector) Snapshot() *Stats {
 
 		sorted := ep.reservoir.Sorted()
 		if len(sorted) > 0 {
-			es.P50 = percentile(sorted, 50)
-			es.P90 = percentile(sorted, 90)
-			es.P95 = percentile(sorted, 95)
-			es.P99 = percentile(sorted, 99)
-			es.Min = ep.reservoir.Min()
-			es.Max = ep.reservoir.Max()
+			es.P50 = JSONDuration(percentile(sorted, 50))
+			es.P90 = JSONDuration(percentile(sorted, 90))
+			es.P95 = JSONDuration(percentile(sorted, 95))
+			es.P99 = JSONDuration(percentile(sorted, 99))
+			es.Min = JSONDuration(ep.reservoir.Min())
+			es.Max = JSONDuration(ep.reservoir.Max())
 			if ep.reservoir.Count() > 0 {
-				es.Avg = ep.reservoir.Sum() / time.Duration(ep.reservoir.Count())
+				es.Avg = JSONDuration(ep.reservoir.Sum() / time.Duration(ep.reservoir.Count()))
 			}
 		}
 
@@ -222,18 +256,19 @@ func (c *Collector) Snapshot() *Stats {
 		stats.TotalRequests += total
 		stats.SuccessCount += ep.successes
 		stats.ErrorCount += ep.errors
+		stats.TotalBytes += ep.bytes
 	}
 
 	// Global percentiles from the maintained global reservoir
 	if c.global.Count() > 0 {
 		globalSorted := c.global.Sorted()
-		stats.P50 = percentile(globalSorted, 50)
-		stats.P90 = percentile(globalSorted, 90)
-		stats.P95 = percentile(globalSorted, 95)
-		stats.P99 = percentile(globalSorted, 99)
-		stats.Min = c.global.Min()
-		stats.Max = c.global.Max()
-		stats.Avg = c.global.Sum() / time.Duration(c.global.Count())
+		stats.P50 = JSONDuration(percentile(globalSorted, 50))
+		stats.P90 = JSONDuration(percentile(globalSorted, 90))
+		stats.P95 = JSONDuration(percentile(globalSorted, 95))
+		stats.P99 = JSONDuration(percentile(globalSorted, 99))
+		stats.Min = JSONDuration(c.global.Min())
+		stats.Max = JSONDuration(c.global.Max())
+		stats.Avg = JSONDuration(c.global.Sum() / time.Duration(c.global.Count()))
 	}
 
 	if elapsed.Seconds() > 0 {
@@ -241,8 +276,8 @@ func (c *Collector) Snapshot() *Stats {
 	}
 
 	// Compute instantaneous RPS from sliding window
-	now := time.Now().Truncate(time.Second)
-	windowElapsed := int(now.Sub(c.recentTime) / time.Second)
+	nowTrunc := now.Truncate(time.Second)
+	windowElapsed := int(nowTrunc.Sub(c.recentTime) / time.Second)
 	if windowElapsed < rpsWindow {
 		var sum int64
 		validBuckets := 0

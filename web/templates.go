@@ -7,7 +7,10 @@ import (
 	"io"
 	"io/fs"
 	"path/filepath"
+	"sort"
+	"time"
 
+	"github.com/jvreagan/perf-test/internal/metrics"
 	"github.com/jvreagan/perf-test/internal/reporter"
 )
 
@@ -29,9 +32,19 @@ var funcMap = template.FuncMap{
 		}
 		return s
 	},
-	"fmtDuration": reporter.FmtDur,
-	"fmtElapsed":  reporter.FormatElapsed,
+	"fmtDuration": func(d metrics.JSONDuration) string { return reporter.FmtDur(d.Duration()) },
+	"fmtElapsed":  func(d metrics.JSONDuration) string { return reporter.FormatElapsed(d.Duration()) },
 	"fmtFloat":    func(f float64) string { return fmt.Sprintf("%.1f", f) },
+	"sortedEndpoints": func(m map[string]*metrics.EndpointStats) []string {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return keys
+	},
+	"fmtBytes": func(b int64) string { return reporter.FmtBytes(b) },
+	"fmtTime":  func(t time.Time) string { return t.Format("2006-01-02 15:04:05") },
 	"fmtPct": func(errors, total int64) string {
 		if total == 0 {
 			return "0.0"

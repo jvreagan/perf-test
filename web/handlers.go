@@ -41,7 +41,11 @@ func (h *Handlers) handleConfigure(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) handleConfigurePost(w http.ResponseWriter, r *http.Request) {
-	fd := ParseFormData(r)
+	fd, err := ParseFormData(r)
+	if err != nil {
+		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	action := r.FormValue("action")
 
 	switch {

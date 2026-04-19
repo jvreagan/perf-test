@@ -16,9 +16,9 @@ func TestEvaluateThresholds_AllPass(t *testing.T) {
 		MinRPS:     10.0,
 	}
 	stats := &Stats{
-		P95:           200 * time.Millisecond,
-		P99:           800 * time.Millisecond,
-		Max:           1500 * time.Millisecond,
+		P95:           JSONDuration(200 * time.Millisecond),
+		P99:           JSONDuration(800 * time.Millisecond),
+		Max:           JSONDuration(1500 * time.Millisecond),
 		TotalRequests: 1000,
 		ErrorCount:    10, // 1%
 		RPS:           50.0,
@@ -43,7 +43,7 @@ func TestEvaluateThresholds_SomeFail(t *testing.T) {
 		ErrorRate: 1.0,
 	}
 	stats := &Stats{
-		P95:           500 * time.Millisecond, // exceeds 100ms
+		P95:           JSONDuration(500 * time.Millisecond), // exceeds 100ms
 		TotalRequests: 100,
 		ErrorCount:    5, // 5% > 1%
 		RPS:           20.0,

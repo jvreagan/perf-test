@@ -109,9 +109,15 @@ func DefaultFormData() *FormData {
 	}
 }
 
+// maxFormSize limits the request body size for form submissions (1 MB).
+const maxFormSize = 1 << 20
+
 // ParseFormData extracts FormData from an HTTP request.
-func ParseFormData(r *http.Request) *FormData {
-	r.ParseForm()
+func ParseFormData(r *http.Request) (*FormData, error) {
+	r.Body = http.MaxBytesReader(nil, r.Body, maxFormSize)
+	if err := r.ParseForm(); err != nil {
+		return nil, fmt.Errorf("parsing form: %w", err)
+	}
 
 	fd := &FormData{
 		Name:        r.FormValue("name"),
@@ -198,7 +204,7 @@ func ParseFormData(r *http.Request) *FormData {
 		fd.Endpoints = append(fd.Endpoints, ep)
 	}
 
-	return fd
+	return fd, nil
 }
 
 // ToConfig converts FormData to a config.Config, returning validation errors.

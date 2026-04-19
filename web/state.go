@@ -134,9 +134,10 @@ func (s *State) StartTest(cfg *config.Config) *TestRun {
 	// Evict oldest completed tests if history exceeds limit
 	for len(s.order) > maxTestHistory {
 		oldID := s.order[0]
-		if oldID != s.activeID {
-			delete(s.tests, oldID)
+		if oldID == s.activeID {
+			break // don't evict the active test
 		}
+		delete(s.tests, oldID)
 		s.order = s.order[1:]
 	}
 	s.mu.Unlock()

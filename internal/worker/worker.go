@@ -10,7 +10,6 @@ import (
 
 // Worker executes HTTP requests against weighted endpoints.
 type Worker struct {
-	id        int
 	exec      *Executor
 	resultCh  chan<- metrics.Result
 	thinkTime time.Duration
@@ -18,9 +17,8 @@ type Worker struct {
 }
 
 // New creates a Worker that delegates execution to exec and optionally rate-limits via limiter.
-func New(id int, exec *Executor, resultCh chan<- metrics.Result, thinkTime time.Duration, limiter *ratelimit.Limiter) *Worker {
+func New(exec *Executor, resultCh chan<- metrics.Result, thinkTime time.Duration, limiter *ratelimit.Limiter) *Worker {
 	return &Worker{
-		id:        id,
 		exec:      exec,
 		resultCh:  resultCh,
 		thinkTime: thinkTime,
@@ -57,9 +55,11 @@ func (w *Worker) Run(ctx context.Context) {
 		}
 
 		if w.thinkTime > 0 {
+			t := time.NewTimer(w.thinkTime)
 			select {
-			case <-time.After(w.thinkTime):
+			case <-t.C:
 			case <-ctx.Done():
+				t.Stop()
 				return
 			}
 		}

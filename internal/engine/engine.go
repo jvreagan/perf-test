@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jvreagan/perf-test/internal/config"
@@ -89,8 +90,10 @@ func (e *Engine) Run(ctx context.Context, w io.Writer) (*metrics.Stats, error) {
 				snap := collector.Snapshot()
 				reporter.Print(w, snap)
 			case <-ctx.Done():
+				reporter.Print(w, collector.Snapshot())
 				return
 			case <-schedDone:
+				reporter.Print(w, collector.Snapshot())
 				return
 			}
 		}
@@ -173,8 +176,7 @@ func (e *Engine) runVU(ctx context.Context, exec *worker.Executor, collector *me
 			for i := current; i < target; i++ {
 				wCtx, wCancel := context.WithCancel(ctx)
 				done := make(chan struct{})
-				id := i
-				w := worker.New(id, exec, resultCh, e.cfg.Load.ThinkTime.Duration, limiter)
+				w := worker.New(exec, resultCh, e.cfg.Load.ThinkTime.Duration, limiter)
 				go func() {
 					defer close(done)
 					w.Run(wCtx)
@@ -220,6 +222,7 @@ func (e *Engine) runArrivalRate(ctx context.Context, exec *worker.Executor, coll
 
 		// max concurrency = 2x target RPS (prevents unbounded goroutine growth)
 		sem := make(chan struct{}, rps*2)
+		var inflight atomic.Int64
 		dCtx, dCancel := context.WithCancel(ctx)
 		dispatchCancel = dCancel
 		dispatchDone = make(chan struct{})
@@ -236,11 +239,16 @@ func (e *Engine) runArrivalRate(ctx context.Context, exec *worker.Executor, coll
 				case <-ticker.C:
 					select {
 					case sem <- struct{}{}:
-						collector.SetActiveVUs(len(sem))
+						n := inflight.Add(1)
+						collector.SetActiveVUs(int(n))
 						inflightWG.Add(1)
 						go func() {
 							defer inflightWG.Done()
-							defer func() { <-sem }()
+							defer func() {
+								<-sem
+								n := inflight.Add(-1)
+								collector.SetActiveVUs(int(n))
+							}()
 							ep := exec.SelectEndpoint()
 							// Use parent ctx so rate changes don't abort in-flight requests.
 							result := exec.Execute(ctx, ep)

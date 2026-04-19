@@ -22,8 +22,11 @@ func NewServer(addr string, state *State, templates *Templates) *http.Server {
 	mux.HandleFunc("POST /test/{id}/stop", h.handleTestStop)
 
 	return &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:         addr,
+		Handler:      mux,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 }
 

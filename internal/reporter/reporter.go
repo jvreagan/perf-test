@@ -14,12 +14,15 @@ import (
 
 // Print writes a periodic stats table to w.
 func Print(w io.Writer, stats *metrics.Stats) {
+	if stats == nil {
+		return
+	}
 	errPct := 0.0
 	if stats.TotalRequests > 0 {
 		errPct = float64(stats.ErrorCount) / float64(stats.TotalRequests) * 100
 	}
 
-	elapsed := FormatElapsed(stats.Elapsed)
+	elapsed := FormatElapsed(stats.Elapsed.Duration())
 	fmt.Fprintf(w, "\n[ %s ] VUs: %d  RPS: %.1f  Reqs: %d  Errors: %d (%.1f%%)\n",
 		elapsed, stats.ActiveVUs, stats.InstantRPS, stats.TotalRequests, stats.ErrorCount, errPct)
 	fmt.Fprintln(w, strings.Repeat("─", 65))
@@ -32,9 +35,9 @@ func Print(w io.Writer, stats *metrics.Stats) {
 		fmt.Fprintf(w, "%-30s %6d  %8s  %8s  %8s\n",
 			truncate(name, 30),
 			es.TotalRequests,
-			FmtDur(es.P50),
-			FmtDur(es.P90),
-			FmtDur(es.P99),
+			FmtDur(es.P50.Duration()),
+			FmtDur(es.P90.Duration()),
+			FmtDur(es.P99.Duration()),
 		)
 	}
 	fmt.Fprintln(w, strings.Repeat("─", 65))
@@ -42,20 +45,24 @@ func Print(w io.Writer, stats *metrics.Stats) {
 
 // Summary writes the final summary report to w.
 func Summary(w io.Writer, stats *metrics.Stats) {
+	if stats == nil {
+		return
+	}
 	fmt.Fprintln(w, "\n"+strings.Repeat("═", 65))
 	fmt.Fprintln(w, "  FINAL SUMMARY")
 	fmt.Fprintln(w, strings.Repeat("═", 65))
-	fmt.Fprintf(w, "  Duration:       %s\n", FormatElapsed(stats.Elapsed))
+	fmt.Fprintf(w, "  Duration:       %s\n", FormatElapsed(stats.Elapsed.Duration()))
 	fmt.Fprintf(w, "  Total Requests: %d\n", stats.TotalRequests)
 	fmt.Fprintf(w, "  Success:        %d\n", stats.SuccessCount)
 	fmt.Fprintf(w, "  Errors:         %d\n", stats.ErrorCount)
 	fmt.Fprintf(w, "  Avg RPS:        %.2f\n", stats.RPS)
+	fmt.Fprintf(w, "  Data Received:  %s\n", FmtBytes(stats.TotalBytes))
 	fmt.Fprintln(w, strings.Repeat("─", 65))
 	fmt.Fprintf(w, "  %-10s  %10s  %10s  %10s  %10s\n", "Metric", "p50", "p90", "p95", "p99")
 	fmt.Fprintln(w, strings.Repeat("─", 65))
 	fmt.Fprintf(w, "  %-10s  %10s  %10s  %10s  %10s\n", "Latency",
-		FmtDur(stats.P50), FmtDur(stats.P90), FmtDur(stats.P95), FmtDur(stats.P99))
-	fmt.Fprintf(w, "  Min: %s  Max: %s  Avg: %s\n", FmtDur(stats.Min), FmtDur(stats.Max), FmtDur(stats.Avg))
+		FmtDur(stats.P50.Duration()), FmtDur(stats.P90.Duration()), FmtDur(stats.P95.Duration()), FmtDur(stats.P99.Duration()))
+	fmt.Fprintf(w, "  Min: %s  Max: %s  Avg: %s\n", FmtDur(stats.Min.Duration()), FmtDur(stats.Max.Duration()), FmtDur(stats.Avg.Duration()))
 
 	if len(stats.PerEndpoint) > 0 {
 		fmt.Fprintln(w, strings.Repeat("─", 65))
@@ -67,9 +74,9 @@ func Summary(w io.Writer, stats *metrics.Stats) {
 			fmt.Fprintf(w, "  %-28s %6d %8s %8s %8s %8d\n",
 				truncate(name, 28),
 				es.TotalRequests,
-				FmtDur(es.P50),
-				FmtDur(es.P90),
-				FmtDur(es.P99),
+				FmtDur(es.P50.Duration()),
+				FmtDur(es.P90.Duration()),
+				FmtDur(es.P99.Duration()),
 				es.ErrorCount,
 			)
 		}
@@ -179,9 +186,29 @@ func sortedStringKeys(m map[string]int64) []string {
 	return keys
 }
 
+// FmtBytes formats a byte count in a human-friendly way.
+func FmtBytes(b int64) string {
+	const (
+		KB = 1024
+		MB = 1024 * KB
+		GB = 1024 * MB
+	)
+	switch {
+	case b >= GB:
+		return fmt.Sprintf("%.1f GB", float64(b)/float64(GB))
+	case b >= MB:
+		return fmt.Sprintf("%.1f MB", float64(b)/float64(MB))
+	case b >= KB:
+		return fmt.Sprintf("%.1f KB", float64(b)/float64(KB))
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
+}
+
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
-	return s[:n-1] + "…"
+	return string(runes[:n-1]) + "…"
 }

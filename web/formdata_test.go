@@ -48,7 +48,10 @@ func TestParseFormData_BasicFields(t *testing.T) {
 		"output_interval": {"5s"},
 		"output_file":     {"results.json"},
 	}
-	fd := ParseFormData(makeFormRequest(vals))
+	fd, err := ParseFormData(makeFormRequest(vals))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if fd.Name != "My Test" {
 		t.Errorf("name: got %q", fd.Name)
@@ -83,7 +86,10 @@ func TestParseFormData_Endpoints(t *testing.T) {
 		"endpoints[1].weight":        {"1"},
 		"endpoints[1].expect_status": {"201"},
 	}
-	fd := ParseFormData(makeFormRequest(vals))
+	fd, err := ParseFormData(makeFormRequest(vals))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if len(fd.Endpoints) != 2 {
 		t.Fatalf("expected 2 endpoints, got %d", len(fd.Endpoints))
@@ -117,7 +123,10 @@ func TestParseFormData_Stages(t *testing.T) {
 		"stages[1].target":   {"50"},
 		"stages[1].ramp":     {"step"},
 	}
-	fd := ParseFormData(makeFormRequest(vals))
+	fd, err := ParseFormData(makeFormRequest(vals))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if len(fd.Stages) != 2 {
 		t.Fatalf("expected 2 stages, got %d", len(fd.Stages))
@@ -137,7 +146,10 @@ func TestParseFormData_Variables(t *testing.T) {
 		"variables[1].key":   {"token"},
 		"variables[1].value": {"abc123"},
 	}
-	fd := ParseFormData(makeFormRequest(vals))
+	fd, err := ParseFormData(makeFormRequest(vals))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if len(fd.Variables) != 2 {
 		t.Fatalf("expected 2 variables, got %d", len(fd.Variables))
@@ -417,7 +429,10 @@ func TestParseFormData_Thresholds(t *testing.T) {
 		"threshold_error_rate":  {"5"},
 		"threshold_min_rps":     {"100"},
 	}
-	fd := ParseFormData(makeFormRequest(vals))
+	fd, err := ParseFormData(makeFormRequest(vals))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if fd.ThresholdP95 != "500ms" {
 		t.Errorf("threshold_p95: got %q", fd.ThresholdP95)

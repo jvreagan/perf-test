@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/jvreagan/perf-test/internal/config"
 )
@@ -23,8 +22,8 @@ func EvaluateThresholds(tc config.ThresholdConfig, stats *Stats) []ThresholdResu
 		results = append(results, ThresholdResult{
 			Name:      "p95 latency",
 			Threshold: fmt.Sprintf("<= %s", tc.P95.Duration),
-			Actual:    fmtDuration(stats.P95),
-			Passed:    stats.P95 <= tc.P95.Duration,
+			Actual:    stats.P95.Duration().String(),
+			Passed:    stats.P95.Duration() <= tc.P95.Duration,
 		})
 	}
 
@@ -32,8 +31,8 @@ func EvaluateThresholds(tc config.ThresholdConfig, stats *Stats) []ThresholdResu
 		results = append(results, ThresholdResult{
 			Name:      "p99 latency",
 			Threshold: fmt.Sprintf("<= %s", tc.P99.Duration),
-			Actual:    fmtDuration(stats.P99),
-			Passed:    stats.P99 <= tc.P99.Duration,
+			Actual:    stats.P99.Duration().String(),
+			Passed:    stats.P99.Duration() <= tc.P99.Duration,
 		})
 	}
 
@@ -41,8 +40,8 @@ func EvaluateThresholds(tc config.ThresholdConfig, stats *Stats) []ThresholdResu
 		results = append(results, ThresholdResult{
 			Name:      "max latency",
 			Threshold: fmt.Sprintf("<= %s", tc.MaxLatency.Duration),
-			Actual:    fmtDuration(stats.Max),
-			Passed:    stats.Max <= tc.MaxLatency.Duration,
+			Actual:    stats.Max.Duration().String(),
+			Passed:    stats.Max.Duration() <= tc.MaxLatency.Duration,
 		})
 	}
 
@@ -79,8 +78,4 @@ func AnyFailed(results []ThresholdResult) bool {
 		}
 	}
 	return false
-}
-
-func fmtDuration(d time.Duration) string {
-	return d.String()
 }

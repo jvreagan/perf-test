@@ -15,6 +15,11 @@
 </div>
 {{end}}
 
+
+<p style="color:#888; margin:0 0 1em">
+    Started: {{fmtTime .TestRun.StartedAt}}{{if not .TestRun.GetFinishedAt.IsZero}} &mdash; Finished: {{fmtTime .TestRun.GetFinishedAt}}{{end}}
+</p>
+
 {{if .Stats}}
 <div class="stats-grid">
     <div class="stat-box">
@@ -36,6 +41,10 @@
     <div class="stat-box">
         <div class="value">{{fmtFloat .Stats.RPS}}</div>
         <div class="label">Avg RPS</div>
+    </div>
+    <div class="stat-box">
+        <div class="value">{{fmtBytes .Stats.TotalBytes}}</div>
+        <div class="label">Data Received</div>
     </div>
 </div>
 
@@ -86,7 +95,9 @@
             </tr>
         </thead>
         <tbody>
-            {{range $name, $ep := .Stats.PerEndpoint}}
+            {{$endpoints := .Stats.PerEndpoint}}
+            {{range $name := sortedEndpoints $endpoints}}
+            {{$ep := index $endpoints $name}}
             <tr>
                 <td>{{$name}}</td>
                 <td class="num">{{$ep.TotalRequests}}</td>

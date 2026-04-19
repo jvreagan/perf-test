@@ -11,7 +11,7 @@
     <p><strong>{{.Active.Config.Name}}</strong></p>
     <div class="actions">
         <a href="/test/{{.Active.ID}}" class="btn btn-primary">View Progress</a>
-        <a href="/test/{{.Active.ID}}/stop" class="btn btn-danger">Stop</a>
+        <form method="POST" action="/test/{{.Active.ID}}/stop" style="display:inline"><button type="submit" class="btn btn-danger">Stop</button></form>
     </div>
 </div>
 {{end}}

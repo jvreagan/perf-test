@@ -56,7 +56,7 @@ func TestExecutor_Execute_Success(t *testing.T) {
 	ep := makeEndpoint("test", "GET", srv.URL, 1, 200)
 	exec := NewExecutor([]config.Endpoint{ep}, gen, srv.Client())
 
-	result := exec.Execute(context.Background(), ep)
+	result := exec.Execute(context.Background(), &ep)
 	if !result.Success {
 		t.Errorf("expected success, got error: %v", result.Error)
 	}
@@ -78,7 +78,7 @@ func TestExecutor_Execute_StatusMismatch(t *testing.T) {
 	ep := makeEndpoint("test", "GET", srv.URL, 1, 200) // expects 200, gets 404
 	exec := NewExecutor([]config.Endpoint{ep}, gen, srv.Client())
 
-	result := exec.Execute(context.Background(), ep)
+	result := exec.Execute(context.Background(), &ep)
 	if result.Success {
 		t.Error("expected failure for status mismatch")
 	}
@@ -102,7 +102,7 @@ func TestExecutor_Execute_CtxCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	result := exec.Execute(ctx, ep)
+	result := exec.Execute(ctx, &ep)
 	if result.Success {
 		t.Error("expected failure with cancelled context")
 	}
@@ -135,7 +135,7 @@ func TestExecutor_Execute_LargeBody(t *testing.T) {
 	ep := makeEndpoint("large", "GET", srv.URL, 1, 200)
 	exec := NewExecutor([]config.Endpoint{ep}, gen, srv.Client())
 
-	result := exec.Execute(context.Background(), ep)
+	result := exec.Execute(context.Background(), &ep)
 	if !result.Success {
 		t.Errorf("expected success, got error: %v", result.Error)
 	}
@@ -154,7 +154,7 @@ func TestExecutor_Execute_EmptyBody(t *testing.T) {
 	ep := makeEndpoint("empty", "GET", srv.URL, 1, 204)
 	exec := NewExecutor([]config.Endpoint{ep}, gen, srv.Client())
 
-	result := exec.Execute(context.Background(), ep)
+	result := exec.Execute(context.Background(), &ep)
 	if !result.Success {
 		t.Errorf("expected success, got error: %v", result.Error)
 	}
@@ -185,7 +185,7 @@ func TestExecutor_Execute_PostWithBody(t *testing.T) {
 	}
 	exec := NewExecutor([]config.Endpoint{ep}, gen, srv.Client())
 
-	result := exec.Execute(context.Background(), ep)
+	result := exec.Execute(context.Background(), &ep)
 	if !result.Success {
 		t.Errorf("expected success, got error: %v", result.Error)
 	}
@@ -216,7 +216,7 @@ func TestExecutor_Execute_HeaderTemplating(t *testing.T) {
 	}
 	exec := NewExecutor([]config.Endpoint{ep}, gen, srv.Client())
 
-	result := exec.Execute(context.Background(), ep)
+	result := exec.Execute(context.Background(), &ep)
 	if !result.Success {
 		t.Errorf("expected success: %v", result.Error)
 	}
@@ -230,7 +230,7 @@ func TestExecutor_Execute_InvalidURL(t *testing.T) {
 	ep := makeEndpoint("bad", "GET", "://invalid-url", 1, 200)
 	exec := NewExecutor([]config.Endpoint{ep}, gen, http.DefaultClient)
 
-	result := exec.Execute(context.Background(), ep)
+	result := exec.Execute(context.Background(), &ep)
 	if result.Success {
 		t.Error("expected failure for invalid URL")
 	}
@@ -281,7 +281,7 @@ func TestExecutor_Execute_BytesReceivedAccuracy(t *testing.T) {
 			ep := makeEndpoint("test", "GET", srv.URL, 1, 200)
 			exec := NewExecutor([]config.Endpoint{ep}, gen, srv.Client())
 
-			result := exec.Execute(context.Background(), ep)
+			result := exec.Execute(context.Background(), &ep)
 			if !result.Success {
 				t.Fatalf("unexpected error: %v", result.Error)
 			}

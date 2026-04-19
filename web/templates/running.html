@@ -39,6 +39,10 @@
         <div class="value">{{fmtDuration .Stats.P50}}</div>
         <div class="label">p50 Latency</div>
     </div>
+    <div class="stat-box">
+        <div class="value">{{fmtBytes .Stats.TotalBytes}}</div>
+        <div class="label">Data Received</div>
+    </div>
 </div>
 
 {{if .Stats.PerEndpoint}}
@@ -56,7 +60,9 @@
             </tr>
         </thead>
         <tbody>
-            {{range $name, $ep := .Stats.PerEndpoint}}
+            {{$endpoints := .Stats.PerEndpoint}}
+            {{range $name := sortedEndpoints $endpoints}}
+            {{$ep := index $endpoints $name}}
             <tr>
                 <td>{{$name}}</td>
                 <td class="num">{{$ep.TotalRequests}}</td>

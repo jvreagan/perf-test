@@ -44,15 +44,16 @@ func (s *Scheduler) Run(ctx context.Context, targetCh chan<- int) {
 		}
 	}
 
-	// sendFinal does a best-effort non-blocking send of 0 for graceful shutdown.
-	// Using non-blocking because ctx is already cancelled and we can't block.
+	// sendFinal sends 0 for graceful shutdown with a timeout to avoid blocking forever.
 	sendFinal := func() {
 		if lastSent == 0 {
 			return
 		}
+		timer := time.NewTimer(time.Second)
+		defer timer.Stop()
 		select {
 		case targetCh <- 0:
-		default:
+		case <-timer.C:
 		}
 	}
 

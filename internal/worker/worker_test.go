@@ -23,9 +23,9 @@ func makeEndpoint(name, method, url string, weight, status int) config.Endpoint 
 	}
 }
 
-func newWorker(id int, eps []config.Endpoint, gen *data.Generator, client *http.Client, resultCh chan<- metrics.Result, thinkTime time.Duration) *Worker {
+func newWorker(eps []config.Endpoint, gen *data.Generator, client *http.Client, resultCh chan<- metrics.Result, thinkTime time.Duration) *Worker {
 	exec := NewExecutor(eps, gen, client)
-	return New(id, exec, resultCh, thinkTime, nil)
+	return New(exec, resultCh, thinkTime, nil)
 }
 
 func TestWorker_BasicRequest(t *testing.T) {
@@ -38,7 +38,7 @@ func TestWorker_BasicRequest(t *testing.T) {
 	resultCh := make(chan metrics.Result, 10)
 	gen := data.NewGenerator(nil)
 	ep := makeEndpoint("test", "GET", srv.URL, 1, 200)
-	w := newWorker(1, []config.Endpoint{ep}, gen, srv.Client(), resultCh, 0)
+	w := newWorker([]config.Endpoint{ep}, gen, srv.Client(), resultCh, 0)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go w.Run(ctx)
@@ -66,7 +66,7 @@ func TestWorker_ErrorStatus(t *testing.T) {
 	resultCh := make(chan metrics.Result, 10)
 	gen := data.NewGenerator(nil)
 	ep := makeEndpoint("test", "GET", srv.URL, 1, 200) // expects 200, gets 500
-	w := newWorker(1, []config.Endpoint{ep}, gen, srv.Client(), resultCh, 0)
+	w := newWorker([]config.Endpoint{ep}, gen, srv.Client(), resultCh, 0)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
@@ -92,7 +92,7 @@ func TestWorker_ThinkTime(t *testing.T) {
 	gen := data.NewGenerator(nil)
 	ep := makeEndpoint("test", "GET", srv.URL, 1, 200)
 	// 50ms think time: in 200ms we expect ~3-4 requests (not 100+)
-	w := newWorker(1, []config.Endpoint{ep}, gen, srv.Client(), resultCh, 50*time.Millisecond)
+	w := newWorker([]config.Endpoint{ep}, gen, srv.Client(), resultCh, 50*time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
@@ -116,7 +116,7 @@ func TestWorker_WeightedSelection(t *testing.T) {
 	}
 	gen := data.NewGenerator(nil)
 	resultCh := make(chan metrics.Result, 10000)
-	w := newWorker(1, eps, gen, srv.Client(), resultCh, 0)
+	w := newWorker(eps, gen, srv.Client(), resultCh, 0)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -162,7 +162,7 @@ func TestWorker_BodyTemplate(t *testing.T) {
 			"Content-Type": "application/json",
 		},
 	}
-	w := newWorker(1, []config.Endpoint{ep}, gen, srv.Client(), resultCh, 0)
+	w := newWorker([]config.Endpoint{ep}, gen, srv.Client(), resultCh, 0)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -183,7 +183,7 @@ func TestWorker_CtxCancel(t *testing.T) {
 	resultCh := make(chan metrics.Result, 10)
 	gen := data.NewGenerator(nil)
 	ep := makeEndpoint("slow", "GET", srv.URL, 1, 200)
-	w := newWorker(1, []config.Endpoint{ep}, gen, srv.Client(), resultCh, 0)
+	w := newWorker([]config.Endpoint{ep}, gen, srv.Client(), resultCh, 0)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -219,7 +219,7 @@ func TestWorker_WithLimiter_LimitsRate(t *testing.T) {
 
 	// Limit to 10 RPS; run for ~500ms → expect ~5 requests (allow 2–12 range)
 	limiter := ratelimit.NewLimiter(ctx, 10)
-	w := New(1, exec, resultCh, 0, limiter)
+	w := New(exec, resultCh, 0, limiter)
 
 	runCtx, runCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer runCancel()

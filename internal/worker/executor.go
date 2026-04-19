@@ -31,8 +31,8 @@ func NewExecutor(endpoints []config.Endpoint, gen *data.Generator, client *http.
 	total := 0
 	for i, ep := range endpoints {
 		w := ep.Weight
-		if w <= 0 {
-			w = 1
+		if w < 1 {
+			w = 1 // safety fallback; ApplyDefaults normalizes 0→1
 		}
 		total += w
 		cum[i] = total
@@ -47,20 +47,20 @@ func NewExecutor(endpoints []config.Endpoint, gen *data.Generator, client *http.
 }
 
 // SelectEndpoint picks an endpoint using weighted random selection (binary search).
-func (e *Executor) SelectEndpoint() config.Endpoint {
+func (e *Executor) SelectEndpoint() *config.Endpoint {
 	if len(e.endpoints) == 1 {
-		return e.endpoints[0]
+		return &e.endpoints[0]
 	}
 	r := rand.IntN(e.totalWeight)
 	idx := sort.SearchInts(e.cumWeights, r+1)
 	if idx >= len(e.endpoints) {
 		idx = len(e.endpoints) - 1
 	}
-	return e.endpoints[idx]
+	return &e.endpoints[idx]
 }
 
 // Execute performs a single HTTP request and returns the Result.
-func (e *Executor) Execute(ctx context.Context, ep config.Endpoint) metrics.Result {
+func (e *Executor) Execute(ctx context.Context, ep *config.Endpoint) metrics.Result {
 	url := e.gen.Generate(ep.URL)
 	method := ep.Method
 
