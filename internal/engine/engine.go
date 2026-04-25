@@ -188,7 +188,12 @@ func (e *Engine) runVU(ctx context.Context, exec *worker.Executor, collector *me
 			workers = workers[:target]
 			for _, we := range toRemove {
 				we.cancel()
-				<-we.done
+				timer := time.NewTimer(5 * time.Second)
+				select {
+				case <-we.done:
+				case <-timer.C:
+				}
+				timer.Stop()
 			}
 		}
 		collector.SetActiveVUs(len(workers))

@@ -151,10 +151,11 @@
             </tr>
         </thead>
         <tbody>
-            {{range $code, $count := .Stats.StatusCodes}}
+            {{$codes := .Stats.StatusCodes}}
+            {{range $code := sortedIntKeys $codes}}
             <tr>
                 <td>{{$code}}</td>
-                <td class="num">{{$count}}</td>
+                <td class="num">{{index $codes $code}}</td>
             </tr>
             {{end}}
         </tbody>
@@ -173,10 +174,11 @@
             </tr>
         </thead>
         <tbody>
-            {{range $errType, $count := .Stats.ErrorTypes}}
+            {{$types := .Stats.ErrorTypes}}
+            {{range $errType := sortedStringKeys $types}}
             <tr>
                 <td>{{$errType}}</td>
-                <td class="num">{{$count}}</td>
+                <td class="num">{{index $types $errType}}</td>
             </tr>
             {{end}}
         </tbody>

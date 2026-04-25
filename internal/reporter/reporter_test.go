@@ -138,14 +138,42 @@ func TestFmtDur(t *testing.T) {
 		want string
 	}{
 		{0, "-"},
+		{1 * time.Microsecond, "1.0µs"},
 		{500 * time.Microsecond, "500.0µs"},
+		{999 * time.Microsecond, "999.0µs"},
+		{1 * time.Millisecond, "1.0ms"},
 		{45 * time.Millisecond, "45.0ms"},
+		{999 * time.Millisecond, "999.0ms"},
+		{1 * time.Second, "1.00s"},
 		{2 * time.Second, "2.00s"},
+		{60 * time.Second, "60.00s"},
 	}
 	for _, tc := range tests {
 		got := FmtDur(tc.d)
 		if got != tc.want {
 			t.Errorf("FmtDur(%v) = %q, want %q", tc.d, got, tc.want)
+		}
+	}
+}
+
+func TestFmtBytes(t *testing.T) {
+	tests := []struct {
+		b    int64
+		want string
+	}{
+		{0, "0 B"},
+		{1, "1 B"},
+		{1023, "1023 B"},
+		{1024, "1.0 KB"},
+		{1536, "1.5 KB"},
+		{1024 * 1024, "1.0 MB"},
+		{1024 * 1024 * 1024, "1.0 GB"},
+		{int64(1.5 * 1024 * 1024 * 1024), "1.5 GB"},
+	}
+	for _, tc := range tests {
+		got := FmtBytes(tc.b)
+		if got != tc.want {
+			t.Errorf("FmtBytes(%d) = %q, want %q", tc.b, got, tc.want)
 		}
 	}
 }

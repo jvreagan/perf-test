@@ -17,7 +17,7 @@
 <div class="stats-grid">
     <div class="stat-box">
         <div class="value">{{fmtElapsed .Stats.Elapsed}}</div>
-        <div class="label">Elapsed</div>
+        <div class="label">Elapsed{{if .TotalDuration}} / {{.TotalDuration}}{{end}}</div>
     </div>
     <div class="stat-box">
         <div class="value">{{.Stats.ActiveVUs}}</div>
@@ -38,6 +38,14 @@
     <div class="stat-box">
         <div class="value">{{fmtDuration .Stats.P50}}</div>
         <div class="label">p50 Latency</div>
+    </div>
+    <div class="stat-box">
+        <div class="value">{{fmtDuration .Stats.P90}}</div>
+        <div class="label">p90 Latency</div>
+    </div>
+    <div class="stat-box">
+        <div class="value">{{fmtDuration .Stats.P99}}</div>
+        <div class="label">p99 Latency</div>
     </div>
     <div class="stat-box">
         <div class="value">{{fmtBytes .Stats.TotalBytes}}</div>
@@ -81,9 +89,10 @@
 <div class="card">
     <h2>Status Codes</h2>
     <div class="stats-grid">
-        {{range $code, $count := .Stats.StatusCodes}}
+        {{$codes := .Stats.StatusCodes}}
+        {{range $code := sortedIntKeys $codes}}
         <div class="stat-box">
-            <div class="value">{{$count}}</div>
+            <div class="value">{{index $codes $code}}</div>
             <div class="label">{{$code}}</div>
         </div>
         {{end}}
@@ -95,9 +104,10 @@
 <div class="card">
     <h2>Error Types</h2>
     <div class="stats-grid">
-        {{range $errType, $count := .Stats.ErrorTypes}}
+        {{$types := .Stats.ErrorTypes}}
+        {{range $errType := sortedStringKeys $types}}
         <div class="stat-box">
-            <div class="value">{{$count}}</div>
+            <div class="value">{{index $types $errType}}</div>
             <div class="label">{{$errType}}</div>
         </div>
         {{end}}

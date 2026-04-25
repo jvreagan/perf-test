@@ -268,9 +268,21 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("stage[%d]: ramp must be \"linear\" or \"step\" (got %q)", i, s.Ramp)
 		}
 	}
+	// Check for duplicate endpoint names
+	seenNames := make(map[string]int)
+	for i, ep := range c.Endpoints {
+		if prev, ok := seenNames[ep.Name]; ok {
+			return fmt.Errorf("endpoint[%d] has duplicate name %q (same as endpoint[%d])", i, ep.Name, prev)
+		}
+		seenNames[ep.Name] = i
+	}
+
 	validFormats := map[string]bool{"console": true, "json": true}
 	if !validFormats[c.Output.Format] {
 		return fmt.Errorf("output.format must be one of: console, json (got %q)", c.Output.Format)
+	}
+	if c.Output.Interval.Duration <= 0 {
+		return fmt.Errorf("output.interval must be positive (got %s)", c.Output.Interval.Duration)
 	}
 	if c.Thresholds.ErrorRate < 0 || c.Thresholds.ErrorRate > 100 {
 		return fmt.Errorf("thresholds.error_rate must be between 0 and 100 (got %.1f)", c.Thresholds.ErrorRate)

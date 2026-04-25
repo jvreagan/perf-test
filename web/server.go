@@ -61,6 +61,7 @@ func ListenAndServe(addr, templateDir string) error {
 	case err := <-errCh:
 		return err
 	case <-sigCh:
+		signal.Stop(sigCh)
 		fmt.Println("\nShutting down gracefully...")
 		// Stop any active test
 		if active := state.ActiveTest(); active != nil {

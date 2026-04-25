@@ -15,7 +15,28 @@ type ThresholdResult struct {
 }
 
 // EvaluateThresholds checks stats against configured thresholds.
+// If no requests were completed, all thresholds fail with "no data".
 func EvaluateThresholds(tc config.ThresholdConfig, stats *Stats) []ThresholdResult {
+	if stats.TotalRequests == 0 {
+		var results []ThresholdResult
+		if tc.P95.Duration > 0 {
+			results = append(results, ThresholdResult{Name: "p95 latency", Threshold: fmt.Sprintf("<= %s", tc.P95.Duration), Actual: "no data", Passed: false})
+		}
+		if tc.P99.Duration > 0 {
+			results = append(results, ThresholdResult{Name: "p99 latency", Threshold: fmt.Sprintf("<= %s", tc.P99.Duration), Actual: "no data", Passed: false})
+		}
+		if tc.MaxLatency.Duration > 0 {
+			results = append(results, ThresholdResult{Name: "max latency", Threshold: fmt.Sprintf("<= %s", tc.MaxLatency.Duration), Actual: "no data", Passed: false})
+		}
+		if tc.ErrorRate > 0 {
+			results = append(results, ThresholdResult{Name: "error rate", Threshold: fmt.Sprintf("<= %.1f%%", tc.ErrorRate), Actual: "no data", Passed: false})
+		}
+		if tc.MinRPS > 0 {
+			results = append(results, ThresholdResult{Name: "min RPS", Threshold: fmt.Sprintf(">= %.1f", tc.MinRPS), Actual: "0.0", Passed: false})
+		}
+		return results
+	}
+
 	var results []ThresholdResult
 
 	if tc.P95.Duration > 0 {

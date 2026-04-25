@@ -45,6 +45,22 @@ var funcMap = template.FuncMap{
 	},
 	"fmtBytes": func(b int64) string { return reporter.FmtBytes(b) },
 	"fmtTime":  func(t time.Time) string { return t.Format("2006-01-02 15:04:05") },
+	"sortedIntKeys": func(m map[int]int64) []int {
+		keys := make([]int, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Ints(keys)
+		return keys
+	},
+	"sortedStringKeys": func(m map[string]int64) []string {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return keys
+	},
 	"fmtPct": func(errors, total int64) string {
 		if total == 0 {
 			return "0.0"

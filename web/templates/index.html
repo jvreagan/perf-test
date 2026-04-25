@@ -29,6 +29,7 @@
                 {{else if eq .GetStatus "stopped"}}<span class="badge badge-stopped">stopped</span>{{end}}
                 <div class="test-meta">
                     {{if .GetFinalStats}}{{.GetFinalStats.TotalRequests}} requests | {{fmtElapsed .GetFinalStats.Elapsed}}{{end}}
+                    {{if not .GetFinishedAt.IsZero}} | {{fmtTime .GetFinishedAt}}{{end}}
                 </div>
             </div>
             <a href="/test/{{.ID}}" class="btn btn-sm btn-outline">View</a>

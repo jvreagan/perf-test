@@ -2,6 +2,9 @@ package metrics
 
 import (
 	"encoding/json"
+	"errors"
+	"math"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -182,12 +185,30 @@ func (c *Collector) Record(r Result) {
 	}
 }
 
-// classifyError categorizes an error by inspecting its message.
+// classifyError categorizes an error using type assertions with string fallback.
 func classifyError(err error) string {
-	msg := strings.ToLower(err.Error())
+	// Use type assertions for network errors first
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return "timeout"
+	}
 
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return "dns_error"
+	}
+
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if opErr.Op == "dial" {
+			return "connection_refused"
+		}
+	}
+
+	// Fall back to string matching for errors without distinct types
+	msg := strings.ToLower(err.Error())
 	switch {
-	case strings.Contains(msg, "status mismatch") || strings.Contains(msg, "expected status"):
+	case strings.Contains(msg, "expected status") || strings.Contains(msg, "status mismatch"):
 		return "status_mismatch"
 	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline exceeded"):
 		return "timeout"
@@ -306,6 +327,12 @@ func percentile(sorted []time.Duration, p float64) time.Duration {
 	if len(sorted) == 0 {
 		return 0
 	}
-	idx := int(float64(len(sorted)-1) * p / 100.0)
+	idx := int(math.Ceil(float64(len(sorted))*p/100.0)) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(sorted) {
+		idx = len(sorted) - 1
+	}
 	return sorted[idx]
 }
