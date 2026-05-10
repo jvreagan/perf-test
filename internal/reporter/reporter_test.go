@@ -179,6 +179,12 @@ func TestFmtBytes(t *testing.T) {
 }
 
 func TestFormatDuration(t *testing.T) {
+	if got := FormatElapsed(5300 * time.Millisecond); got != "5.3s" {
+		t.Errorf("expected 5.3s, got %q", got)
+	}
+	if got := FormatElapsed(0); got != "0.0s" {
+		t.Errorf("expected 0.0s, got %q", got)
+	}
 	if got := FormatElapsed(90 * time.Second); got != "01:30" {
 		t.Errorf("expected 01:30, got %q", got)
 	}

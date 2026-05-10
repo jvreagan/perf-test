@@ -184,6 +184,7 @@
                     <option {{if eq $ep.Method "DELETE"}}selected{{end}}>DELETE</option>
                     <option {{if eq $ep.Method "PATCH"}}selected{{end}}>PATCH</option>
                     <option {{if eq $ep.Method "HEAD"}}selected{{end}}>HEAD</option>
+                    <option {{if eq $ep.Method "OPTIONS"}}selected{{end}}>OPTIONS</option>
                 </select>
             </div>
         </div>
@@ -200,7 +201,7 @@
             </div>
             <div></div>
         </div>
-        <label>Request Body (optional)</label>
+        <label>Request Body (optional) <span style="font-weight:normal;color:#888;font-size:0.85rem">&mdash; Content-Type defaults to application/json when body is set</span></label>
         <textarea name="endpoints[{{$i}}].body" placeholder='{"name":"${random.string(8)}"}'>{{$ep.Body}}</textarea>
 
         <fieldset style="margin-top:0.5rem;">

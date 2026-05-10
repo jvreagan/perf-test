@@ -148,7 +148,7 @@ func FmtDur(d time.Duration) string {
 	return fmt.Sprintf("%.2fs", d.Seconds())
 }
 
-// FormatElapsed formats an elapsed duration as MM:SS or HH:MM:SS.
+// FormatElapsed formats an elapsed duration as seconds (sub-minute), MM:SS, or HH:MM:SS.
 func FormatElapsed(d time.Duration) string {
 	h := int(d.Hours())
 	m := int(d.Minutes()) % 60
@@ -156,7 +156,10 @@ func FormatElapsed(d time.Duration) string {
 	if h > 0 {
 		return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 	}
-	return fmt.Sprintf("%02d:%02d", m, s)
+	if m > 0 {
+		return fmt.Sprintf("%02d:%02d", m, s)
+	}
+	return fmt.Sprintf("%.1fs", d.Seconds())
 }
 
 func sortedKeys(m map[string]*metrics.EndpointStats) []string {

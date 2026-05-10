@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -429,6 +430,94 @@ func TestValidate_NegativeMinRPS(t *testing.T) {
 	}
 }
 
+func TestValidate_DuplicateEndpointNames(t *testing.T) {
+	cfg := &Config{
+		Endpoints: []Endpoint{
+			{Name: "get-users", URL: "http://x/users", Weight: 1, Method: "GET", Expect: ExpectConfig{Status: 200}},
+			{Name: "get-users", URL: "http://x/users2", Weight: 1, Method: "GET", Expect: ExpectConfig{Status: 200}},
+		},
+		Load: LoadConfig{
+			Mode:   "vu",
+			Stages: []Stage{{Duration: Duration{5 * time.Second}, Target: 1}},
+		},
+		Output: OutputConfig{Format: "console", Interval: Duration{5 * time.Second}},
+	}
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("expected validation error for duplicate endpoint names")
+	}
+	if err != nil && !strings.Contains(err.Error(), "duplicate name") {
+		t.Errorf("expected 'duplicate name' in error, got: %v", err)
+	}
+}
+
+func TestValidate_NonPositiveOutputInterval(t *testing.T) {
+	cfg := &Config{
+		Endpoints: []Endpoint{{URL: "http://x", Weight: 1, Method: "GET", Expect: ExpectConfig{Status: 200}}},
+		Load: LoadConfig{
+			Mode:   "vu",
+			Stages: []Stage{{Duration: Duration{5 * time.Second}, Target: 1}},
+		},
+		Output: OutputConfig{Format: "console", Interval: Duration{0}},
+	}
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("expected validation error for zero output interval")
+	}
+	if err != nil && !strings.Contains(err.Error(), "output.interval must be positive") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestNormalizeStages_Direct(t *testing.T) {
+	t.Run("no-op when stages exist", func(t *testing.T) {
+		cfg := &Config{
+			Load: LoadConfig{
+				Stages: []Stage{{Duration: Duration{10 * time.Second}, Target: 5}},
+				MaxVUs: 50,
+			},
+		}
+		cfg.NormalizeStages()
+		if len(cfg.Load.Stages) != 1 {
+			t.Errorf("expected stages unchanged, got %d", len(cfg.Load.Stages))
+		}
+	})
+
+	t.Run("no-op when MaxVUs is 0", func(t *testing.T) {
+		cfg := &Config{
+			Load: LoadConfig{
+				RampUp:      Duration{10 * time.Second},
+				SteadyState: Duration{30 * time.Second},
+				MaxVUs:      0,
+			},
+		}
+		cfg.NormalizeStages()
+		if len(cfg.Load.Stages) != 0 {
+			t.Errorf("expected no stages when MaxVUs=0, got %d", len(cfg.Load.Stages))
+		}
+	})
+
+	t.Run("partial shorthand (no ramp_down)", func(t *testing.T) {
+		cfg := &Config{
+			Load: LoadConfig{
+				RampUp:      Duration{10 * time.Second},
+				SteadyState: Duration{30 * time.Second},
+				MaxVUs:      20,
+			},
+		}
+		cfg.NormalizeStages()
+		if len(cfg.Load.Stages) != 2 {
+			t.Fatalf("expected 2 stages, got %d", len(cfg.Load.Stages))
+		}
+		if cfg.Load.Stages[0].Target != 20 || cfg.Load.Stages[0].Duration.Duration != 10*time.Second {
+			t.Errorf("ramp_up stage wrong: %+v", cfg.Load.Stages[0])
+		}
+		if cfg.Load.Stages[1].Target != 20 || cfg.Load.Stages[1].Duration.Duration != 30*time.Second {
+			t.Errorf("steady_state stage wrong: %+v", cfg.Load.Stages[1])
+		}
+	})
+}
+
 func TestTotalDuration(t *testing.T) {
 	cfg := &Config{
 		Load: LoadConfig{
@@ -442,5 +531,21 @@ func TestTotalDuration(t *testing.T) {
 	expected := 50 * time.Second
 	if got := cfg.TotalDuration(); got != expected {
 		t.Errorf("expected %v, got %v", expected, got)
+	}
+}
+
+func TestTotalDuration_ShorthandBeforeNormalize(t *testing.T) {
+	cfg := &Config{
+		Load: LoadConfig{
+			RampUp:      Duration{10 * time.Second},
+			SteadyState: Duration{30 * time.Second},
+			RampDown:    Duration{10 * time.Second},
+			MaxVUs:      50,
+		},
+	}
+	// Before NormalizeStages, TotalDuration should still return the correct total
+	expected := 50 * time.Second
+	if got := cfg.TotalDuration(); got != expected {
+		t.Errorf("expected %v before NormalizeStages, got %v", expected, got)
 	}
 }

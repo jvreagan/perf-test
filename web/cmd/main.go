@@ -13,6 +13,6 @@ func main() {
 	flag.Parse()
 
 	if err := web.ListenAndServe(*addr, *templateDir); err != nil {
-		log.Fatal(err)
+		log.Fatalf("perf-test web UI: %v", err)
 	}
 }

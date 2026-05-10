@@ -544,3 +544,23 @@ func TestArrivalRate_FullFlow(t *testing.T) {
 		t.Error("expected at least some requests in arrival rate test")
 	}
 }
+
+func TestStopNonRunningTest(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}))
+	defer target.Close()
+
+	ts, _, client := setupIntegrationServer(t, target.URL)
+
+	// Stop a non-existent test — should redirect gracefully, not panic
+	resp, err := client.Post(ts.URL+"/test/nonexistent/stop", "", nil)
+	if err != nil {
+		t.Fatalf("POST stop: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Errorf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+}

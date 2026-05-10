@@ -80,6 +80,33 @@ func TestEvaluateThresholds_NoThresholds(t *testing.T) {
 	}
 }
 
+func TestEvaluateThresholds_ZeroRequests(t *testing.T) {
+	tc := config.ThresholdConfig{
+		P95:        config.Duration{Duration: 500 * time.Millisecond},
+		P99:        config.Duration{Duration: 2 * time.Second},
+		MaxLatency: config.Duration{Duration: 5 * time.Second},
+		ErrorRate:  5.0,
+		MinRPS:     10.0,
+	}
+	stats := &Stats{TotalRequests: 0}
+
+	results := EvaluateThresholds(tc, stats)
+	if len(results) != 5 {
+		t.Fatalf("expected 5 results for zero requests, got %d", len(results))
+	}
+	for _, r := range results {
+		if r.Passed {
+			t.Errorf("expected %q to fail with zero requests", r.Name)
+		}
+	}
+	// Latency thresholds should show "no data"
+	for _, r := range results[:3] {
+		if r.Actual != "no data" {
+			t.Errorf("expected 'no data' for %q, got %q", r.Name, r.Actual)
+		}
+	}
+}
+
 func TestEvaluateThresholds_MinRPSFail(t *testing.T) {
 	tc := config.ThresholdConfig{
 		MinRPS: 100.0,

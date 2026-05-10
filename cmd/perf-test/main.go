@@ -51,7 +51,7 @@ func runCmd() *cobra.Command {
 			if cfg.Description != "" {
 				fmt.Printf("  %s\n", cfg.Description)
 			}
-			fmt.Printf("  Duration: %s  Endpoints: %d\n\n", cfg.TotalDuration(), len(cfg.Endpoints))
+			fmt.Printf("  Mode: %s  Duration: %s  Endpoints: %d\n\n", cfg.Load.Mode, cfg.TotalDuration(), len(cfg.Endpoints))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

@@ -305,5 +305,8 @@ func (c *Config) TotalDuration() time.Duration {
 	for _, s := range c.Load.Stages {
 		total += s.Duration.Duration
 	}
+	if total == 0 {
+		total = c.Load.RampUp.Duration + c.Load.SteadyState.Duration + c.Load.RampDown.Duration
+	}
 	return total
 }

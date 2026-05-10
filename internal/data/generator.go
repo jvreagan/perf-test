@@ -3,7 +3,6 @@ package data
 import (
 	"crypto/rand"
 	"fmt"
-	"math/big"
 	mathrand "math/rand/v2"
 	"regexp"
 	"strconv"
@@ -152,9 +151,9 @@ func randomEmail() string {
 	words := []string{"alice", "bob", "carol", "dave", "eve", "frank", "grace", "hank"}
 	domains := []string{"example.com", "test.org", "mail.net", "demo.io"}
 	w := words[mathrand.IntN(len(words))]
-	n, _ := rand.Int(rand.Reader, big.NewInt(9000))
+	n := mathrand.IntN(9000) + 1000
 	d := domains[mathrand.IntN(len(domains))]
-	return fmt.Sprintf("%s%d@%s", w, n.Int64()+1000, d)
+	return fmt.Sprintf("%s%d@%s", w, n, d)
 }
 
 const alphanumeric = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -162,8 +161,7 @@ const alphanumeric = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345
 func randomAlphanumeric(n int) string {
 	b := make([]byte, n)
 	for i := range b {
-		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(alphanumeric))))
-		b[i] = alphanumeric[idx.Int64()]
+		b[i] = alphanumeric[mathrand.IntN(len(alphanumeric))]
 	}
 	return string(b)
 }

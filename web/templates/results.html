@@ -92,6 +92,7 @@
                 <th class="num">p95</th>
                 <th class="num">p99</th>
                 <th class="num">Avg</th>
+                <th class="num">Data</th>
             </tr>
         </thead>
         <tbody>
@@ -107,6 +108,7 @@
                 <td class="num">{{fmtDuration $ep.P95}}</td>
                 <td class="num">{{fmtDuration $ep.P99}}</td>
                 <td class="num">{{fmtDuration $ep.Avg}}</td>
+                <td class="num">{{fmtBytes $ep.TotalBytes}}</td>
             </tr>
             {{end}}
         </tbody>

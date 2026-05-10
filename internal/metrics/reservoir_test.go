@@ -82,6 +82,38 @@ func TestReservoir_EmptyPercentile(t *testing.T) {
 	}
 }
 
+func TestReservoir_SortedCache(t *testing.T) {
+	r := NewReservoir(100)
+	r.Add(30 * time.Millisecond)
+	r.Add(10 * time.Millisecond)
+	r.Add(20 * time.Millisecond)
+
+	// First Sorted() should sort and cache
+	s1 := r.Sorted()
+	if s1[0] != 10*time.Millisecond || s1[2] != 30*time.Millisecond {
+		t.Errorf("expected sorted [10ms,20ms,30ms], got %v", s1)
+	}
+
+	// Second Sorted() without Add should return cached result (same pointer)
+	s2 := r.Sorted()
+	if &s1[0] != &s2[0] {
+		t.Error("expected cached slice to be reused without Add()")
+	}
+
+	// Add() should invalidate cache
+	r.Add(5 * time.Millisecond)
+	s3 := r.Sorted()
+	if &s1[0] == &s3[0] {
+		t.Error("expected new slice after Add() invalidated cache")
+	}
+	if s3[0] != 5*time.Millisecond {
+		t.Errorf("expected 5ms as first element after Add, got %v", s3[0])
+	}
+	if len(s3) != 4 {
+		t.Errorf("expected 4 elements, got %d", len(s3))
+	}
+}
+
 func TestReservoir_ExactStats(t *testing.T) {
 	r := NewReservoir(10)
 	// Add 100 items (exceeds reservoir size) — exact stats still correct
